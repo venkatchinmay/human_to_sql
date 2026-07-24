@@ -1,0 +1,14 @@
+apiVersion: v2
+name: schema-rag
+description: MySQL Schema RAG for Text-to-SQL — FastAPI app with Qdrant, Ollama, and MySQL
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+maintainers:
+  - name: schema-rag
+keywords:
+  - rag
+  - text-to-sql
+  - mysql
+  - qdrant
+  - ollama

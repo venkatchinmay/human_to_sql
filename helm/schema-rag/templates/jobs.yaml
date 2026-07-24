@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "schema-rag.fullname" . }}-ingest
+  labels:
+    {{- include "schema-rag.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        {{- include "schema-rag.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.28
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ include "schema-rag.fullname" . }}-mysql 3306; do
+                echo waiting for mysql;
+                sleep 5;
+              done
+      containers:
+        - name: ingest
+          image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}"
+          imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+          command: ["python", "-m", "schema_rag.scripts.ingest"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "schema-rag.fullname" . }}-env
+            - secretRef:
+                name: {{ include "schema-rag.fullname" . }}-secret
+                optional: true
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"

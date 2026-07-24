@@ -1,0 +1,102 @@
+version: "3.9"
+
+services:
+  # ---------------------------------------------------------------------------
+  # MySQL
+  # ---------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: schema-rag-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-schema_rag_test}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./tests/fixtures/sample_schema.sql:/docker-entrypoint-initdb.d/01-sample.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ---------------------------------------------------------------------------
+  # Qdrant
+  # ---------------------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: schema-rag-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ---------------------------------------------------------------------------
+  # Ollama (LLM backend)
+  # ---------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: schema-rag-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    # Pre-pull the model manually after startup
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      ollama serve &
+      sleep 5
+      ollama pull ${OLLAMA_MODEL:-gemma2:2b}
+      wait
+
+  # ---------------------------------------------------------------------------
+  # Application
+  # ---------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: schema-rag-app
+    ports:
+      - "8000:8000"
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-schema_rag_test}
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: mysql_schema
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma2:2b}
+      FK_EXPAND_DEPTH: ${FK_EXPAND_DEPTH:-1}
+      TOP_K_RETRIEVAL: ${TOP_K_RETRIEVAL:-10}
+      TOP_K_FINAL: ${TOP_K_FINAL:-5}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    volumes:
+      - app-data:/app/data
+
+volumes:
+  mysql-data:
+  qdrant-data:
+  ollama-data:
+  app-data:

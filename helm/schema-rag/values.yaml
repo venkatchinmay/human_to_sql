@@ -1,0 +1,137 @@
+# ---------------------------------------------------------------------------
+# Global settings
+# ---------------------------------------------------------------------------
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# ---------------------------------------------------------------------------
+# Application (FastAPI)
+# ---------------------------------------------------------------------------
+app:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: schema-rag
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "2Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  env:
+    LOG_LEVEL: "INFO"
+    FK_EXPAND_DEPTH: "1"
+    TOP_K_RETRIEVAL: "10"
+    TOP_K_FINAL: "5"
+    QDRANT_COLLECTION: "mysql_schema"
+    DENSE_MODEL: "BAAI/bge-small-en-v1.5"
+    SPARSE_MODEL: "prithivida/Splade_PP_en_v1"
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 60
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# ---------------------------------------------------------------------------
+# Ingress
+# ---------------------------------------------------------------------------
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: schema-rag.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# ---------------------------------------------------------------------------
+# MySQL
+# ---------------------------------------------------------------------------
+mysql:
+  enabled: true
+  image: mysql:8.0
+  replicaCount: 1
+  auth:
+    rootPassword: "rootpassword"
+    database: "schema_rag_test"
+  service:
+    type: ClusterIP
+    port: 3306
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+  initSchema: true  # Mount sample schema on first start
+
+# ---------------------------------------------------------------------------
+# Qdrant
+# ---------------------------------------------------------------------------
+qdrant:
+  enabled: true
+  image: qdrant/qdrant:latest
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 6333
+    grpcPort: 6334
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+
+# ---------------------------------------------------------------------------
+# Ollama
+# ---------------------------------------------------------------------------
+ollama:
+  enabled: true
+  image: ollama/ollama:latest
+  replicaCount: 1
+  model: "gemma2:2b"
+  service:
+    type: ClusterIP
+    port: 11434
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"

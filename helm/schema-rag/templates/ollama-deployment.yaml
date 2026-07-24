@@ -1,0 +1,112 @@
+{{- if .Values.ollama.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "schema-rag.fullname" . }}-ollama
+  labels:
+    {{- include "schema-rag.componentLabels" (list . "ollama") | nindent 4 }}
+spec:
+  replicas: {{ .Values.ollama.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "schema-rag.componentLabels" (list . "ollama") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "schema-rag.componentLabels" (list . "ollama") | nindent 8 }}
+    spec:
+      containers:
+        - name: ollama
+          image: {{ .Values.ollama.image }}
+          ports:
+            - containerPort: 11434
+              name: http
+          volumeMounts:
+            - name: ollama-data
+              mountPath: /root/.ollama
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 11434
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 11434
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            {{- toYaml .Values.ollama.resources | nindent 12 }}
+      initContainers:
+        - name: model-puller
+          image: {{ .Values.ollama.image }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              ollama serve &
+              SERVER_PID=$!
+              until ollama list > /dev/null 2>&1; do
+                echo "Waiting for Ollama server..."
+                sleep 3
+              done
+              echo "Pulling model {{ .Values.ollama.model }}..."
+              ollama pull {{ .Values.ollama.model }}
+              echo "Model pull complete."
+              kill $SERVER_PID
+          volumeMounts:
+            - name: ollama-data
+              mountPath: /root/.ollama
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+      volumes:
+        - name: ollama-data
+          {{- if .Values.ollama.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "schema-rag.fullname" . }}-ollama-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "schema-rag.fullname" . }}-ollama
+  labels:
+    {{- include "schema-rag.componentLabels" (list . "ollama") | nindent 4 }}
+spec:
+  type: {{ .Values.ollama.service.type }}
+  ports:
+    - port: {{ .Values.ollama.service.port }}
+      targetPort: 11434
+      name: http
+  selector:
+    {{- include "schema-rag.componentLabels" (list . "ollama") | nindent 4 }}
+---
+{{- if .Values.ollama.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "schema-rag.fullname" . }}-ollama-data
+  labels:
+    {{- include "schema-rag.componentLabels" (list . "ollama") | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.ollama.persistence.storageClass }}
+  storageClassName: {{ .Values.ollama.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.ollama.persistence.size }}
+{{- end }}
+{{- end }}

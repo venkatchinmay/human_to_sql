@@ -1,0 +1,92 @@
+{{- if .Values.qdrant.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "schema-rag.fullname" . }}-qdrant
+  labels:
+    {{- include "schema-rag.componentLabels" (list . "qdrant") | nindent 4 }}
+spec:
+  serviceName: {{ include "schema-rag.fullname" . }}-qdrant
+  replicas: {{ .Values.qdrant.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "schema-rag.componentLabels" (list . "qdrant") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "schema-rag.componentLabels" (list . "qdrant") | nindent 8 }}
+    spec:
+      containers:
+        - name: qdrant
+          image: {{ .Values.qdrant.image }}
+          ports:
+            - containerPort: 6333
+              name: http
+            - containerPort: 6334
+              name: grpc
+          volumeMounts:
+            - name: qdrant-data
+              mountPath: /qdrant/storage
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 6333
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 6333
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 5
+          resources:
+            {{- toYaml .Values.qdrant.resources | nindent 12 }}
+      volumes:
+        - name: qdrant-data
+          {{- if .Values.qdrant.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "schema-rag.fullname" . }}-qdrant-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "schema-rag.fullname" . }}-qdrant
+  labels:
+    {{- include "schema-rag.componentLabels" (list . "qdrant") | nindent 4 }}
+spec:
+  type: {{ .Values.qdrant.service.type }}
+  ports:
+    - port: {{ .Values.qdrant.service.port }}
+      targetPort: 6333
+      name: http
+    - port: {{ .Values.qdrant.service.grpcPort }}
+      targetPort: 6334
+      name: grpc
+  selector:
+    {{- include "schema-rag.componentLabels" (list . "qdrant") | nindent 4 }}
+---
+{{- if .Values.qdrant.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "schema-rag.fullname" . }}-qdrant-data
+  labels:
+    {{- include "schema-rag.componentLabels" (list . "qdrant") | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.qdrant.persistence.storageClass }}
+  storageClassName: {{ .Values.qdrant.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.qdrant.persistence.size }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,67 @@
+docker build -t schema-rag:latest .
+#0 building with "rancher-desktop" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 690B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.11-slim
+#2 DONE 2.1s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [builder 1/5] FROM docker.io/library/python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93
+#4 resolve docker.io/library/python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93 0.0s done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 9.69kB done
+#5 DONE 0.0s
+
+#6 [stage-1 2/5] WORKDIR /app
+#6 CACHED
+
+#7 [builder 2/5] WORKDIR /build
+#7 CACHED
+
+#8 [builder 5/5] RUN pip install --no-cache-dir --prefix=/install qdrant-client>=1.12.0
+#8 CACHED
+
+#9 [builder 4/5] RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+#9 CACHED
+
+#10 [builder 3/5] COPY requirements.txt .
+#10 CACHED
+
+#11 [stage-1 3/5] COPY --from=builder /install /usr/local
+#11 CACHED
+
+#12 [stage-1 4/5] COPY schema_rag/ schema_rag/
+#12 DONE 0.1s
+
+#13 [stage-1 5/5] RUN mkdir -p /app/data
+#13 DONE 0.6s
+
+#14 exporting to image
+#14 exporting layers
+#14 exporting layers 0.2s done
+#14 exporting manifest sha256:54c7fcf203d6839a503d9ccc7d01f8f43b89624a32ab9749b3383cf2e7e4767d 0.0s done
+#14 exporting config sha256:c4a15990232daab919d6cfd15580047a6a28b14564b48291967d73ffc5156549 0.0s done
+#14 exporting attestation manifest sha256:53d9bb65afb781a3387aa3d72640e75ca62b5cd45bc35ab41c53bffa1546a533 0.1s done
+#14 exporting manifest list sha256:3fda21d1e9f0bb1657d65f109658a434e32011fbedf074012333231da251f5cc
+#14 exporting manifest list sha256:3fda21d1e9f0bb1657d65f109658a434e32011fbedf074012333231da251f5cc 0.0s done
+#14 naming to docker.io/library/schema-rag:latest done
+#14 unpacking to docker.io/library/schema-rag:latest 0.1s done
+#14 DONE 0.4s
+Release "schema-rag" has been upgraded. Happy Helming!
+NAME: schema-rag
+LAST DEPLOYED: Tue Jul 21 20:31:17 2026
+NAMESPACE: default
+STATUS: deployed
+REVISION: 10
+DESCRIPTION: Upgrade complete
+TEST SUITE: None
+Waiting for API pods to start...
+pod/schema-rag-659b84f8df-dwsjk condition met

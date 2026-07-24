@@ -1,0 +1,102 @@
+{{- if .Values.mysql.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "schema-rag.fullname" . }}-mysql
+  labels:
+    {{- include "schema-rag.componentLabels" (list . "mysql") | nindent 4 }}
+spec:
+  serviceName: {{ include "schema-rag.fullname" . }}-mysql
+  replicas: {{ .Values.mysql.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "schema-rag.componentLabels" (list . "mysql") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "schema-rag.componentLabels" (list . "mysql") | nindent 8 }}
+    spec:
+      containers:
+        - name: mysql
+          image: {{ .Values.mysql.image }}
+          ports:
+            - containerPort: 3306
+              name: mysql
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "schema-rag.fullname" . }}-secret
+                  key: MYSQL_PASSWORD
+            - name: MYSQL_DATABASE
+              value: {{ .Values.mysql.auth.database | quote }}
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+            {{- if .Values.mysql.initSchema }}
+            - name: init-schema
+              mountPath: /docker-entrypoint-initdb.d
+            {{- end }}
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 10
+          livenessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 5
+          resources:
+            {{- toYaml .Values.mysql.resources | nindent 12 }}
+      volumes:
+        - name: mysql-data
+          {{- if .Values.mysql.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "schema-rag.fullname" . }}-mysql-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if .Values.mysql.initSchema }}
+        - name: init-schema
+          configMap:
+            name: {{ include "schema-rag.fullname" . }}-init-schema
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "schema-rag.fullname" . }}-mysql
+  labels:
+    {{- include "schema-rag.componentLabels" (list . "mysql") | nindent 4 }}
+spec:
+  type: {{ .Values.mysql.service.type }}
+  ports:
+    - port: {{ .Values.mysql.service.port }}
+      targetPort: 3306
+      name: mysql
+  selector:
+    {{- include "schema-rag.componentLabels" (list . "mysql") | nindent 4 }}
+---
+{{- if .Values.mysql.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "schema-rag.fullname" . }}-mysql-data
+  labels:
+    {{- include "schema-rag.componentLabels" (list . "mysql") | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.mysql.persistence.storageClass }}
+  storageClassName: {{ .Values.mysql.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.mysql.persistence.size }}
+{{- end }}
+{{- end }}

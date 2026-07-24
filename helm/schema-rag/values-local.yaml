@@ -1,0 +1,50 @@
+# values-local.yaml — lightweight settings for minikube / kind / local K8s
+
+app:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "4Gi"
+  livenessProbe:
+    initialDelaySeconds: 600
+    periodSeconds: 20
+    timeoutSeconds: 10
+    failureThreshold: 5
+  readinessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 20
+    timeoutSeconds: 10
+    failureThreshold: 20
+
+mysql:
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: local-path
+
+qdrant:
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: local-path
+
+
+ollama:
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: local-path
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+
+ingress:
+  enabled: false

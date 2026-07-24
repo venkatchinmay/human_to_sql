@@ -1,0 +1,409 @@
+import uvicorn
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse
+import httpx
+
+app = FastAPI()
+
+HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schema RAG Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #09090b 0%, #18181b 100%);
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --primary: #8b5cf6;
+            --primary-hover: #7c3aed;
+            --text-main: #f4f4f5;
+            --text-muted: #a1a1aa;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            margin-top: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #c4b5fd, #a78bfa, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        p.subtitle {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+        }
+
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            margin-bottom: 2rem;
+            transition: transform 0.3s ease;
+        }
+
+        .glass-panel:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .ingest-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        button {
+            font-family: 'Inter', sans-serif;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+            transform: scale(1.02);
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button:disabled {
+            background: #3f3f46;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            font-size: 1.1rem;
+            color: white;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s ease;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+        }
+
+        input[type="text"]::placeholder {
+            color: #52525b;
+        }
+
+        .result-section {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .tag {
+            background: rgba(139, 92, 246, 0.15);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            color: #d8b4fe;
+            padding: 0.35rem 0.85rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+        }
+
+        .tag.expanded {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: rgba(16, 185, 129, 0.2);
+            color: #6ee7b7;
+        }
+
+        .code-container {
+            position: relative;
+            background: #000000;
+            border-radius: 12px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            border: 1px solid #27272a;
+        }
+
+        code {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.95rem;
+            color: #a78bfa;
+            line-height: 1.7;
+            white-space: pre-wrap;
+        }
+
+        .sql-keyword { color: #f472b6; font-weight: 600; }
+        .sql-function { color: #38bdf8; }
+        .sql-string { color: #86efac; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        #error-msg {
+            color: #ef4444;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Schema RAG Portal</h1>
+        <p class="subtitle">Natural Language to SQL with Precision AI Retrieval</p>
+    </header>
+
+    <div class="container">
+        
+        <div class="glass-panel ingest-section">
+            <div>
+                <h3>Database Schema Ingestion</h3>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">Sync your MySQL schema to the Qdrant vector database.</p>
+            </div>
+            <button id="ingest-btn" onclick="triggerIngest()">
+                <div class="spinner" id="ingest-spinner"></div>
+                <span id="ingest-text">Run Ingestion</span>
+            </button>
+        </div>
+        <p id="ingest-success" style="color: #4ade80; text-align: center; margin-bottom: 1rem; display: none;"></p>
+
+        <div class="glass-panel">
+            <h3 style="margin-bottom: 0.5rem; font-weight: 600;">Ask a Question</h3>
+            <div class="input-group">
+                <input type="text" id="question" placeholder="e.g. Show total revenue by customer for last month..." onkeypress="handleEnter(event)">
+                <button id="query-btn" onclick="runQuery()">
+                    <div class="spinner" id="query-spinner"></div>
+                    <span id="query-text">Generate SQL</span>
+                </button>
+            </div>
+            <div id="error-msg"></div>
+        </div>
+
+        <div class="glass-panel result-section" id="result-panel">
+            <h3 style="margin-bottom: 1rem; font-weight: 600;">Retrieved Context</h3>
+            
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Seed Tables:</div>
+            <div class="tags" id="seed-tags"></div>
+
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Expanded FK Tables:</div>
+            <div class="tags" id="expanded-tags"></div>
+
+            <h3 style="margin-top: 2rem; margin-bottom: 1rem; font-weight: 600;">Generated SQL</h3>
+            <div class="code-container">
+                <code id="sql-output"></code>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        async function triggerIngest() {
+            const btn = document.getElementById('ingest-btn');
+            const spinner = document.getElementById('ingest-spinner');
+            const text = document.getElementById('ingest-text');
+            const msg = document.getElementById('ingest-success');
+            
+            btn.disabled = true;
+            spinner.style.display = 'block';
+            text.innerText = 'Ingesting...';
+            msg.style.display = 'none';
+
+            try {
+                const res = await fetch('/proxy/ingest', { method: 'POST' });
+                const data = await res.json();
+                if(res.ok) {
+                    msg.innerText = `Success! Upserted ${data.tables} tables and ${data.points} points.`;
+                    msg.style.display = 'block';
+                } else {
+                    alert("Error: " + JSON.stringify(data));
+                }
+            } catch (err) {
+                alert("Network error: " + err);
+            } finally {
+                btn.disabled = false;
+                spinner.style.display = 'none';
+                text.innerText = 'Run Ingestion';
+            }
+        }
+
+        function handleEnter(e) {
+            if (e.key === 'Enter') runQuery();
+        }
+
+        async function runQuery() {
+            const q = document.getElementById('question').value.trim();
+            if (!q) return;
+
+            const btn = document.getElementById('query-btn');
+            const spinner = document.getElementById('query-spinner');
+            const text = document.getElementById('query-text');
+            const resultPanel = document.getElementById('result-panel');
+            const errorMsg = document.getElementById('error-msg');
+            
+            btn.disabled = true;
+            spinner.style.display = 'block';
+            text.innerText = 'Thinking...';
+            resultPanel.style.display = 'none';
+            errorMsg.style.display = 'none';
+
+            try {
+                const res = await fetch('/proxy/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: q })
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok) {
+                    document.getElementById('seed-tags').innerHTML = 
+                        data.seed_tables.length > 0 ? 
+                        data.seed_tables.map(t => `<span class="tag">${t}</span>`).join('') :
+                        '<span style="color: #71717a; font-size: 0.9rem;">None</span>';
+                        
+                    document.getElementById('expanded-tags').innerHTML = 
+                        data.expanded_tables.length > 0 ? 
+                        data.expanded_tables.map(t => `<span class="tag expanded">${t}</span>`).join('') :
+                        '<span style="color: #71717a; font-size: 0.9rem;">None</span>';
+                        
+                    // Basic SQL syntax highlighting
+                    let sql = data.sql || "";
+                    sql = sql.replace(/(SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|ON|GROUP BY|ORDER BY|LIMIT|AND|OR|AS|IN|SUM|COUNT|AVG)/gi, '<span class="sql-keyword">$1</span>');
+                    
+                    document.getElementById('sql-output').innerHTML = sql;
+                    resultPanel.style.display = 'block';
+                } else {
+                    errorMsg.innerText = "Error: " + JSON.stringify(data.error || data);
+                    errorMsg.style.display = 'block';
+                }
+            } catch (err) {
+                errorMsg.innerText = "Network error: " + err;
+                errorMsg.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                spinner.style.display = 'none';
+                text.innerText = 'Generate SQL';
+            }
+        }
+    </script>
+</body>
+</html>
+"""
+
+@app.get("/")
+async def home():
+    return HTMLResponse(HTML)
+
+@app.post("/proxy/query")
+async def proxy_query(request: Request):
+    data = await request.json()
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.post("http://localhost:8000/query", json=data, timeout=60.0)
+            if resp.status_code == 200:
+                return JSONResponse(resp.json(), status_code=200)
+            else:
+                return JSONResponse({"error": resp.text}, status_code=resp.status_code)
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.post("/proxy/ingest")
+async def proxy_ingest():
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.post("http://localhost:8000/ingest", timeout=300.0)
+            if resp.status_code == 200:
+                return JSONResponse(resp.json(), status_code=200)
+            else:
+                return JSONResponse({"error": resp.text}, status_code=resp.status_code)
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=500)
+
+if __name__ == "__main__":
+    print("Portal started horizontally on http://127.0.0.1:3000")
+    uvicorn.run(app, host="127.0.0.1", port=3000)

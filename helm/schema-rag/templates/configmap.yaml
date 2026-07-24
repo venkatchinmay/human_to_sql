@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "schema-rag.fullname" . }}-env
+  labels:
+    {{- include "schema-rag.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.app.env }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- if .Values.mysql.enabled }}
+  MYSQL_HOST: "{{ include "schema-rag.fullname" $ }}-mysql"
+  MYSQL_PORT: "3306"
+  MYSQL_USER: "root"
+  MYSQL_DATABASE: {{ $.Values.mysql.auth.database | quote }}
+  {{- end }}
+  {{- if .Values.qdrant.enabled }}
+  QDRANT_URL: "http://{{ include "schema-rag.fullname" $ }}-qdrant:6333"
+  {{- end }}
+  {{- if .Values.ollama.enabled }}
+  OLLAMA_URL: "http://{{ include "schema-rag.fullname" $ }}-ollama:11434"
+  OLLAMA_MODEL: {{ $.Values.ollama.model | quote }}
+  {{- end }}
