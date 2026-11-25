@@ -137,3 +137,28 @@ class TestSchemaRetriever:
 
         dense.encode_query.assert_called_once_with("list all users")
         sparse.encode.assert_called_once_with("list all users")
+
+    @patch("schema_rag.retrieval.retriever.load_fk_graph")
+    def test_max_expanded_tables_caps_fanout(self, mock_load: MagicMock) -> None:
+        """FK expansion should respect max_expanded_tables and preserve seed order."""
+        import networkx as nx
+
+        G = nx.DiGraph()
+        for i in range(10):
+            G.add_edge("orders", f"neighbor_{i}")
+        mock_load.return_value = G
+
+        client = _mock_qdrant_client(search_results=[_mock_point("orders")])
+        client.scroll.return_value = ([_mock_point("neighbor_0"), _mock_point("neighbor_1")], None)
+
+        retriever = SchemaRetriever(
+            client,
+            _mock_dense_encoder(),
+            _mock_sparse_encoder(),
+            max_expanded_tables=3,
+        )
+        result = retriever.retrieve("show orders")
+
+        assert result["seed_tables"] == ["orders"]
+        assert len(result["expanded_tables"]) == 3
+        assert result["expanded_tables"][0] == "orders"

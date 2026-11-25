@@ -33,6 +33,7 @@ def main() -> None:
 
     # 2. Build and save FK graph
     print("[2/5] Building FK graph...")
+    FK_GRAPH_PATH.parent.mkdir(parents=True, exist_ok=True)
     G = build_fk_graph(fk_map)
     save_fk_graph(G, FK_GRAPH_PATH)
     print(f"      Saved FK graph to {FK_GRAPH_PATH}")

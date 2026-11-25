@@ -1,4 +1,4 @@
-"""Sparse encoder — wraps naver/splade-v3-small via HuggingFace transformers."""
+"""Sparse encoder — wraps a SPLADE model via HuggingFace transformers."""
 
 from __future__ import annotations
 

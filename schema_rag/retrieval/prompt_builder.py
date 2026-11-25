@@ -14,12 +14,12 @@ natural-language question, generate a single SQL query that answers it.
 
 ## Rules
 
-1. Use ONLY the tables and columns provided in the schema above.
+1. Use ONLY the tables, views, and columns provided in the schema above.
 2. Alias tables when joining (e.g., `orders o JOIN users u ON ...`).
 3. Use the foreign-key relationships shown in the schema for joins.
-4. Return ONLY the SQL statement — no explanation, no markdown fences.
-5. Use MySQL-compatible syntax.
-6. If the question cannot be answered with the given schema, return an empty string.
+4. Return ONLY a single valid MySQL SQL statement — no explanation, no markdown fences, no ellipsis (`...`).
+5. Use MySQL 8.0-compatible read-only syntax (`SELECT` or `WITH` CTEs only).
+6. If the question asks to insert, update, delete, alter, or drop data/tables, or cannot be answered with the given schema, return an empty string.
 
 ## Question
 

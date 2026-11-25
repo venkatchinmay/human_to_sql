@@ -8,12 +8,37 @@ for the Schema RAG text-to-SQL system.
 - `schema/schema.sql` - 100-table MySQL schema with indexes, constraints, full-text index, views, and connected foreign keys.
 - `schema/seed_data.sql` - deterministic seed data for every table.
 - `schema/schema_manifest.json` - machine-readable table, column, FK, index, and view manifest.
-- `testcases/test_cases.csv` - 107 natural-language benchmark cases.
+- `testcases/test_cases.csv` - 147 natural-language benchmark cases.
 - `testcases/coverage_report.md` - concept-to-test coverage summary.
 - `runner/benchmark_runner.py` - dry-run verifier and benchmark runner.
 
-# Step 1: Go to project
-cd /home/chinmay/ZCodeProject
+## Quick Local Run (Docker Compose / Local MySQL)
+
+```bash
+# 1. Regenerate benchmark schema, seed data, manifest, and test cases
+python -m benchmark.generate_suite
+
+# 2. Load schema and seed data into MySQL
+mysql -h 127.0.0.1 -P 3307 -uroot -prootpassword schema_rag_test < benchmark/schema/schema.sql
+mysql -h 127.0.0.1 -P 3307 -uroot -prootpassword schema_rag_test < benchmark/schema/seed_data.sql
+
+# 3. Index MySQL schema + views into Qdrant via the API
+curl -X POST http://localhost:8000/ingest
+
+# 4. Cache expected results from ground-truth SQL
+python -m benchmark.runner.benchmark_runner --progress --dry-run --refresh-expected-results \
+  --mysql-host 127.0.0.1 --mysql-port 3307 --mysql-user root --mysql-password rootpassword --mysql-database schema_rag_test
+
+# 5. Run the benchmark against the API
+python -m benchmark.runner.benchmark_runner --progress --adapter http --adapter-url http://localhost:8000/query \
+  --llm-timeout-seconds 300 --mysql-host 127.0.0.1 --mysql-port 3307 --mysql-user root --mysql-password rootpassword --mysql-database schema_rag_test
+```
+
+## Kubernetes Runbook
+
+```bash
+# Step 1: Go to project root
+cd /path/to/human_to_sql
 
 # Step 2: Generate benchmark files locally
 python3 -m benchmark.generate_suite 

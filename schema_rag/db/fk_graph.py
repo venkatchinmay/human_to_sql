@@ -73,5 +73,59 @@ def expand_via_fk(seed_tables: set[str], G: nx.DiGraph, depth: int = 1) -> set[s
 
     new_tables = expanded - set(seed_tables)
     if new_tables:
-        logger.info("FK expansion added %d tables: %s", len(new_tables), new_tables)
+        logger.info("FK expansion added %d tables: %s", len(new_tables), sorted(new_tables))
     return expanded
+
+
+def expand_via_fk_ranked(
+    seed_tables: list[str],
+    G: nx.DiGraph,
+    depth: int = 1,
+    max_total: int | None = None,
+) -> list[str]:
+    """Expand *seed_tables* along FK edges in deterministic, relevance-ranked order.
+
+    Seed tables are always preserved first in their original ranked order.
+    Discovered neighbors are ordered by hop distance, then by how many already-selected
+    (or seed) tables they connect to, then alphabetically.
+    If *max_total* > 0, the returned list is capped at ``max(max_total, len(seeds))``.
+    """
+    ordered_seeds = list(dict.fromkeys(seed_tables))
+    if depth <= 0 or not ordered_seeds:
+        return ordered_seeds
+
+    seed_set = set(ordered_seeds)
+    selected: list[str] = list(ordered_seeds)
+    visited: set[str] = set(ordered_seeds)
+    frontier: set[str] = set(ordered_seeds)
+
+    for _hop in range(depth):
+        candidates: dict[str, int] = {}
+        for table in frontier:
+            if table not in G:
+                continue
+            neighbors = set(G.successors(table)) | set(G.predecessors(table))
+            for nbr in neighbors:
+                if nbr not in visited:
+                    # Count how many tables in the current frontier / seed set link to nbr
+                    candidates[nbr] = candidates.get(nbr, 0) + (2 if table in seed_set else 1)
+
+        if not candidates:
+            break
+
+        # Sort by highest link count to seed/frontier, then alphabetically
+        ranked_hop = sorted(candidates.keys(), key=lambda t: (-candidates[t], t))
+        for nbr in ranked_hop:
+            if max_total and max_total > 0 and len(selected) >= max_total:
+                break
+            visited.add(nbr)
+            selected.append(nbr)
+
+        if max_total and max_total > 0 and len(selected) >= max_total:
+            break
+        frontier = set(ranked_hop)
+
+    added = len(selected) - len(ordered_seeds)
+    if added > 0:
+        logger.info("FK expansion added %d tables: %s", added, selected[len(ordered_seeds):])
+    return selected

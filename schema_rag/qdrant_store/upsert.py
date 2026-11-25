@@ -28,14 +28,34 @@ def build_doc_text(
     table_name: str,
     columns: list[dict[str, Any]],
     fk_edges: list[dict[str, str]],
+    comment: str = "",
+    table_type: str = "BASE TABLE",
+    indexes: list[dict[str, Any]] | None = None,
 ) -> str:
-    """Build a semantic text representation of a table for embedding."""
-    col_strs = [f"{c['name']} ({c['type']})" for c in columns]
+    """Build a semantic text representation of a table or view for embedding."""
+    col_strs = []
+    for c in columns:
+        desc = f"{c['name']} ({c['type']})"
+        if c.get("comment"):
+            desc += f" - {c['comment']}"
+        col_strs.append(desc)
+
     fk_strs = [f"{e['column']} -> {e['ref_table']}.{e['ref_column']}" for e in fk_edges]
 
-    parts = [f"table: {table_name}"]
+    kind_prefix = "view" if table_type == "VIEW" else "table"
+    parts = [f"{kind_prefix}: {table_name}"]
+    if comment and comment != "VIEW":
+        parts.append(f"description: {comment}")
     if col_strs:
         parts.append(f"columns: {', '.join(col_strs)}")
+    if indexes:
+        idx_strs = [
+            f"{idx['type']} {idx['name']} ({', '.join(idx['columns'])})"
+            for idx in indexes
+            if idx.get("name") != "PRIMARY"
+        ]
+        if idx_strs:
+            parts.append(f"indexes: {'; '.join(idx_strs)}")
     if fk_strs:
         parts.append(f"foreign keys: {', '.join(fk_strs)}")
     return "\n".join(parts)
@@ -45,24 +65,51 @@ def build_ddl(
     table_name: str,
     columns: list[dict[str, Any]],
     fk_edges: list[dict[str, str]],
+    comment: str = "",
+    table_type: str = "BASE TABLE",
+    indexes: list[dict[str, Any]] | None = None,
+    view_definition: str = "",
 ) -> str:
-    """Build a DDL string for the LLM prompt context."""
+    """Build a concise DDL string for the LLM prompt context."""
+    if table_type == "VIEW":
+        col_defs = [f"  {c['name']} {c['type']}" for c in columns]
+        header = f"-- VIEW {table_name}"
+        if view_definition:
+            header += f"\n-- Definition: {view_definition}"
+        return f"{header}\nCREATE VIEW {table_name} (\n" + ",\n".join(col_defs) + "\n);"
+
+    pri_count = sum(1 for c in columns if c.get("key") == "PRI")
     col_defs: list[str] = []
     for c in columns:
-        nullable = "" if c["nullable"] else " NOT NULL"
-        key = ""
-        if c["key"] == "PRI":
-            key = " PRIMARY KEY"
-        col_defs.append(f"  {c['name']} {c['type']}{nullable}{key}")
+        nullable = "" if c.get("nullable", True) else " NOT NULL"
+        key = " PRIMARY KEY" if c.get("key") == "PRI" and pri_count == 1 else ""
+        col_comment = f" /* {c['comment']} */" if c.get("comment") else ""
+        col_defs.append(f"  {c['name']} {c['type']}{nullable}{key}{col_comment}")
 
-    fk_defs: list[str] = []
+    constraint_defs: list[str] = []
+    if pri_count > 1:
+        pri_cols = [c["name"] for c in columns if c.get("key") == "PRI"]
+        constraint_defs.append(f"  PRIMARY KEY ({', '.join(pri_cols)})")
+
+    if indexes:
+        for idx in indexes:
+            iname = idx.get("name", "")
+            cols = ", ".join(idx.get("columns", []))
+            if not cols or iname == "PRIMARY":
+                continue
+            if idx.get("type") == "FULLTEXT":
+                constraint_defs.append(f"  FULLTEXT KEY {iname} ({cols})")
+            elif idx.get("unique"):
+                constraint_defs.append(f"  UNIQUE KEY {iname} ({cols})")
+
     for e in fk_edges:
-        fk_defs.append(
+        constraint_defs.append(
             f"  FOREIGN KEY ({e['column']}) REFERENCES {e['ref_table']}({e['ref_column']})"
         )
 
-    all_lines = col_defs + fk_defs
-    return f"CREATE TABLE {table_name} (\n" + ",\n".join(all_lines) + "\n);"
+    all_lines = col_defs + constraint_defs
+    prefix = f"-- {comment}\n" if comment else ""
+    return f"{prefix}CREATE TABLE {table_name} (\n" + ",\n".join(all_lines) + "\n);"
 
 
 # ---------------------------------------------------------------------------
@@ -81,6 +128,8 @@ def upsert_tables(
     fk_map: dict[str, list[dict[str, str]]],
     dense_enc: DenseEncoder,
     sparse_enc: SparseEncoder,
+    batch_size: int = 64,
+    collection_name: str = QDRANT_COLLECTION,
 ) -> int:
     """Embed and upsert one point per table.  Returns the count of points upserted."""
     points: list[PointStruct] = []
@@ -88,13 +137,32 @@ def upsert_tables(
     for table_name, table_info in tables.items():
         columns = table_info["columns"]
         fk_edges = fk_map.get(table_name, [])
+        comment = table_info.get("comment", "")
+        table_type = table_info.get("table_type", "BASE TABLE")
+        indexes = table_info.get("indexes", [])
+        view_definition = table_info.get("view_definition", "")
 
-        doc_text = build_doc_text(table_name, columns, fk_edges)
-        ddl = build_ddl(table_name, columns, fk_edges)
+        doc_text = build_doc_text(
+            table_name,
+            columns,
+            fk_edges,
+            comment=comment,
+            table_type=table_type,
+            indexes=indexes,
+        )
+        ddl = build_ddl(
+            table_name,
+            columns,
+            fk_edges,
+            comment=comment,
+            table_type=table_type,
+            indexes=indexes,
+            view_definition=view_definition,
+        )
 
         # Dense embedding
         dense_vec = dense_enc.encode_doc(doc_text)
-        if isinstance(dense_vec[0], list):
+        if dense_vec and isinstance(dense_vec[0], list):
             dense_vec = dense_vec[0]  # unwrap for single text
 
         # Sparse embedding
@@ -114,6 +182,7 @@ def upsert_tables(
                 },
                 payload={
                     "table_name": table_name,
+                    "table_type": table_type,
                     "doc_text": doc_text,
                     "ddl": ddl,
                     "columns": [c["name"] for c in columns],
@@ -122,6 +191,9 @@ def upsert_tables(
             )
         )
 
-    client.upsert(collection_name=QDRANT_COLLECTION, points=points)
-    logger.info("Upserted %d points to %s", len(points), QDRANT_COLLECTION)
+    for start in range(0, len(points), batch_size):
+        batch = points[start : start + batch_size]
+        client.upsert(collection_name=collection_name, points=batch)
+
+    logger.info("Upserted %d points to %s", len(points), collection_name)
     return len(points)

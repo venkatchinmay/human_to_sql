@@ -348,7 +348,7 @@ CREATE TABLE customers (
   preferred_language_id BIGINT NULL,
   email VARCHAR(160) NOT NULL,
   first_name VARCHAR(80) NOT NULL,
-  last_name VARCHAR(80) NOT NULL,
+  last_name VARCHAR(80) NULL,
   birth_date DATE NULL,
   created_at DATETIME NOT NULL,
   loyalty_points INT NOT NULL DEFAULT 0,

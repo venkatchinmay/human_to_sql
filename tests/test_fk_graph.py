@@ -9,7 +9,13 @@ from pathlib import Path
 import networkx as nx
 import pytest
 
-from schema_rag.db.fk_graph import build_fk_graph, expand_via_fk, load_fk_graph, save_fk_graph
+from schema_rag.db.fk_graph import (
+    build_fk_graph,
+    expand_via_fk,
+    expand_via_fk_ranked,
+    load_fk_graph,
+    save_fk_graph,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -112,3 +118,22 @@ class TestExpandViaFk:
     def test_empty_seed(self, sample_graph: nx.DiGraph) -> None:
         result = expand_via_fk(set(), sample_graph, depth=1)
         assert result == set()
+
+
+class TestExpandViaFkRanked:
+
+    def test_preserves_seed_order_and_caps(self, sample_graph: nx.DiGraph) -> None:
+        # orders connects to users and order_items; max_total=2 keeps seed + 1 neighbor
+        result = expand_via_fk_ranked(["orders"], sample_graph, depth=1, max_total=2)
+        assert result[0] == "orders"
+        assert len(result) == 2
+        assert result[1] in {"users", "order_items"}
+
+    def test_prioritizes_multi_seed_bridge(self) -> None:
+        G = nx.DiGraph()
+        G.add_edge("orders", "customers")
+        G.add_edge("orders", "shipping_addresses")
+        G.add_edge("invoices", "customers")
+        # customers is linked to BOTH seed tables, so it should rank before shipping_addresses
+        result = expand_via_fk_ranked(["orders", "invoices"], G, depth=1, max_total=3)
+        assert result == ["orders", "invoices", "customers"]

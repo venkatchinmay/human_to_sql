@@ -1,7 +1,11 @@
+import os
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 import httpx
+
+BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
+PORTAL_PORT = int(os.getenv("PORTAL_PORT", "3000"))
 
 app = FastAPI()
 
@@ -315,6 +319,23 @@ HTML = """
             if (e.key === 'Enter') runQuery();
         }
 
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function highlightSql(rawSql) {
+            const escaped = escapeHtml(rawSql);
+            return escaped.replace(
+                /\\b(SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|ON|GROUP\\s+BY|ORDER\\s+BY|HAVING|LIMIT|OFFSET|AND|OR|NOT|AS|IN|IS|NULL|EXISTS|DISTINCT|UNION|ALL|WITH|RECURSIVE|CASE|WHEN|THEN|ELSE|END|DESC|ASC|SUM|COUNT|AVG|MIN|MAX)\\b/gi,
+                '<span class="sql-keyword">$1</span>'
+            );
+        }
+
         async function runQuery() {
             const q = document.getElementById('question').value.trim();
             if (!q) return;
@@ -341,24 +362,26 @@ HTML = """
                 const data = await res.json();
                 
                 if (res.ok) {
+                    const seedTables = Array.isArray(data.seed_tables) ? data.seed_tables : [];
+                    const expandedTables = Array.isArray(data.expanded_tables) ? data.expanded_tables : [];
+
                     document.getElementById('seed-tags').innerHTML = 
-                        data.seed_tables.length > 0 ? 
-                        data.seed_tables.map(t => `<span class="tag">${t}</span>`).join('') :
+                        seedTables.length > 0 ? 
+                        seedTables.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('') :
                         '<span style="color: #71717a; font-size: 0.9rem;">None</span>';
                         
                     document.getElementById('expanded-tags').innerHTML = 
-                        data.expanded_tables.length > 0 ? 
-                        data.expanded_tables.map(t => `<span class="tag expanded">${t}</span>`).join('') :
+                        expandedTables.length > 0 ? 
+                        expandedTables.map(t => `<span class="tag expanded">${escapeHtml(t)}</span>`).join('') :
                         '<span style="color: #71717a; font-size: 0.9rem;">None</span>';
                         
-                    // Basic SQL syntax highlighting
-                    let sql = data.sql || "";
-                    sql = sql.replace(/(SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|ON|GROUP BY|ORDER BY|LIMIT|AND|OR|AS|IN|SUM|COUNT|AVG)/gi, '<span class="sql-keyword">$1</span>');
-                    
-                    document.getElementById('sql-output').innerHTML = sql;
+                    const rawSql = (data.sql || "").trim();
+                    document.getElementById('sql-output').innerHTML = rawSql
+                        ? highlightSql(rawSql)
+                        : '<span style="color: #71717a;">-- No read-only SQL generated for this request.</span>';
                     resultPanel.style.display = 'block';
                 } else {
-                    errorMsg.innerText = "Error: " + JSON.stringify(data.error || data);
+                    errorMsg.innerText = "Error: " + JSON.stringify(data.error || data.detail || data);
                     errorMsg.style.display = 'block';
                 }
             } catch (err) {
@@ -384,7 +407,7 @@ async def proxy_query(request: Request):
     data = await request.json()
     async with httpx.AsyncClient() as client:
         try:
-            resp = await client.post("http://localhost:8000/query", json=data, timeout=60.0)
+            resp = await client.post(f"{BACKEND_URL}/query", json=data, timeout=300.0)
             if resp.status_code == 200:
                 return JSONResponse(resp.json(), status_code=200)
             else:
@@ -396,7 +419,7 @@ async def proxy_query(request: Request):
 async def proxy_ingest():
     async with httpx.AsyncClient() as client:
         try:
-            resp = await client.post("http://localhost:8000/ingest", timeout=300.0)
+            resp = await client.post(f"{BACKEND_URL}/ingest", timeout=300.0)
             if resp.status_code == 200:
                 return JSONResponse(resp.json(), status_code=200)
             else:
@@ -405,5 +428,5 @@ async def proxy_ingest():
             return JSONResponse({"error": str(e)}, status_code=500)
 
 if __name__ == "__main__":
-    print("Portal started horizontally on http://127.0.0.1:3000")
-    uvicorn.run(app, host="127.0.0.1", port=3000)
+    print(f"Portal started on http://127.0.0.1:{PORTAL_PORT} (backend: {BACKEND_URL})")
+    uvicorn.run(app, host="127.0.0.1", port=PORTAL_PORT)

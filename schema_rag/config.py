@@ -45,6 +45,7 @@ OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "gemma2:2b")
 FK_EXPAND_DEPTH: int = int(os.getenv("FK_EXPAND_DEPTH", "1"))
 TOP_K_RETRIEVAL: int = int(os.getenv("TOP_K_RETRIEVAL", "10"))
 TOP_K_FINAL: int = int(os.getenv("TOP_K_FINAL", "5"))
+MAX_EXPANDED_TABLES: int = int(os.getenv("MAX_EXPANDED_TABLES", "12"))
 
 # ---------------------------------------------------------------------------
 # FK graph persistence

@@ -574,7 +574,7 @@
         },
         {
           "name": "last_name",
-          "type": "VARCHAR(80) NOT NULL",
+          "type": "VARCHAR(80) NULL",
           "primary_key": false
         },
         {

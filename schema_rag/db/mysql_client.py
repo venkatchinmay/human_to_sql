@@ -17,16 +17,17 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def get_connection() -> MySQLConnection:
+def get_connection(database: str | None = None) -> MySQLConnection:
     """Create and return a MySQL connection using config values."""
+    db_name = database or MYSQL_DATABASE
     conn = mysql.connector.connect(
         host=MYSQL_HOST,
         port=MYSQL_PORT,
         user=MYSQL_USER,
         password=MYSQL_PASSWORD,
-        database=MYSQL_DATABASE,
+        database=db_name,
     )
-    logger.info("Connected to MySQL %s@%s:%s/%s", MYSQL_USER, MYSQL_HOST, MYSQL_PORT, MYSQL_DATABASE)
+    logger.info("Connected to MySQL %s@%s:%s/%s", MYSQL_USER, MYSQL_HOST, MYSQL_PORT, db_name)
     return conn
 
 
@@ -36,11 +37,30 @@ def get_connection() -> MySQLConnection:
 
 _COLUMNS_SQL = """
 SELECT
-    TABLE_NAME, COLUMN_NAME, DATA_TYPE,
-    COLUMN_KEY, IS_NULLABLE, COLUMN_COMMENT
+    TABLE_NAME, COLUMN_NAME, DATA_TYPE, COLUMN_TYPE,
+    COLUMN_KEY, IS_NULLABLE, COLUMN_COMMENT, EXTRA
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = %s
 ORDER BY TABLE_NAME, ORDINAL_POSITION;
+"""
+
+_TABLES_SQL = """
+SELECT TABLE_NAME, TABLE_TYPE, TABLE_COMMENT
+FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = %s;
+"""
+
+_INDEXES_SQL = """
+SELECT TABLE_NAME, INDEX_NAME, NON_UNIQUE, INDEX_TYPE, COLUMN_NAME
+FROM information_schema.STATISTICS
+WHERE TABLE_SCHEMA = %s
+ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX;
+"""
+
+_VIEWS_SQL = """
+SELECT TABLE_NAME, VIEW_DEFINITION
+FROM information_schema.VIEWS
+WHERE TABLE_SCHEMA = %s;
 """
 
 _FKS_SQL = """
@@ -53,46 +73,83 @@ WHERE TABLE_SCHEMA = %s
 """
 
 
-def fetch_tables(conn: MySQLConnection) -> dict[str, dict[str, Any]]:
-    """Return ``{table_name: {"columns": [...], "comment": ...}}`` for every table."""
+def fetch_tables(conn: MySQLConnection, database: str | None = None) -> dict[str, dict[str, Any]]:
+    """Return schema metadata per table/view for the target database."""
+    db_name = database or MYSQL_DATABASE
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute(_COLUMNS_SQL, (MYSQL_DATABASE,))
+        cursor.execute(_COLUMNS_SQL, (db_name,))
         rows = cursor.fetchall()
 
         tables: dict[str, dict[str, Any]] = {}
         for row in rows:
             tname = row["TABLE_NAME"]
             if tname not in tables:
-                tables[tname] = {"columns": [], "comment": ""}
+                tables[tname] = {
+                    "columns": [],
+                    "comment": "",
+                    "table_type": "BASE TABLE",
+                    "indexes": [],
+                    "view_definition": "",
+                }
             tables[tname]["columns"].append({
                 "name": row["COLUMN_NAME"],
-                "type": row["DATA_TYPE"],
+                "type": row.get("COLUMN_TYPE") or row["DATA_TYPE"],
+                "data_type": row["DATA_TYPE"],
                 "key": row["COLUMN_KEY"],
                 "nullable": row["IS_NULLABLE"] == "YES",
                 "comment": row["COLUMN_COMMENT"] or "",
+                "extra": row.get("EXTRA") or "",
             })
 
-        # Fetch table comments separately
-        cursor.execute(
-            "SELECT TABLE_NAME, TABLE_COMMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = %s",
-            (MYSQL_DATABASE,),
-        )
+        # Fetch table types and comments
+        cursor.execute(_TABLES_SQL, (db_name,))
         for row in cursor.fetchall():
-            if row["TABLE_NAME"] in tables:
-                tables[row["TABLE_NAME"]]["comment"] = row["TABLE_COMMENT"] or ""
+            tname = row["TABLE_NAME"]
+            if tname in tables:
+                tables[tname]["table_type"] = row.get("TABLE_TYPE") or "BASE TABLE"
+                tables[tname]["comment"] = row.get("TABLE_COMMENT") or ""
 
-        logger.info("Fetched %d tables from %s", len(tables), MYSQL_DATABASE)
+        # Fetch indexes (UNIQUE, FULLTEXT, secondary keys)
+        cursor.execute(_INDEXES_SQL, (db_name,))
+        grouped_indexes: dict[tuple[str, str], dict[str, Any]] = {}
+        for row in cursor.fetchall():
+            tname = row["TABLE_NAME"]
+            iname = row["INDEX_NAME"]
+            if tname not in tables:
+                continue
+            key = (tname, iname)
+            if key not in grouped_indexes:
+                grouped_indexes[key] = {
+                    "name": iname,
+                    "unique": row["NON_UNIQUE"] == 0,
+                    "type": row.get("INDEX_TYPE") or "BTREE",
+                    "columns": [],
+                }
+            grouped_indexes[key]["columns"].append(row["COLUMN_NAME"])
+
+        for (tname, _), idx in grouped_indexes.items():
+            tables[tname]["indexes"].append(idx)
+
+        # Fetch view definitions
+        cursor.execute(_VIEWS_SQL, (db_name,))
+        for row in cursor.fetchall():
+            tname = row["TABLE_NAME"]
+            if tname in tables:
+                tables[tname]["view_definition"] = row.get("VIEW_DEFINITION") or ""
+
+        logger.info("Fetched %d tables/views from %s", len(tables), db_name)
         return tables
     finally:
         cursor.close()
 
 
-def fetch_fk_edges(conn: MySQLConnection) -> dict[str, list[dict[str, str]]]:
+def fetch_fk_edges(conn: MySQLConnection, database: str | None = None) -> dict[str, list[dict[str, str]]]:
     """Return ``{table_name: [{"column": ..., "ref_table": ..., "ref_column": ...}]}``."""
+    db_name = database or MYSQL_DATABASE
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute(_FKS_SQL, (MYSQL_DATABASE,))
+        cursor.execute(_FKS_SQL, (db_name,))
         rows = cursor.fetchall()
 
         fk_map: dict[str, list[dict[str, str]]] = {}

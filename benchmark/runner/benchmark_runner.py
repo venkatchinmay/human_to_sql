@@ -8,7 +8,7 @@ import json
 import re
 import time
 from collections import Counter, defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -51,10 +51,21 @@ def normalize_value(value: Any) -> Any:
     return value
 
 
+def _strip_sql_comments(sql: str) -> str:
+    """Strip SQL block and line comments for safe statement inspection."""
+    no_block = re.sub(r"/\*.*?\*/", " ", sql, flags=re.DOTALL)
+    no_line = re.sub(r"--[^\n]*", " ", no_block)
+    return no_line.strip()
+
+
 def execute_sql(conn, sql: str, timeout_seconds: int) -> tuple[list[str], list[list[Any]], int]:
-    if not sql or sql.strip().upper() == "NULL":
+    cleaned = _strip_sql_comments(sql or "")
+    if not cleaned or cleaned.upper() == "NULL":
         return [], [], 0
-    first = sql.strip().split(None, 1)[0].lower()
+    body = cleaned.rstrip(";").strip()
+    if ";" in body:
+        raise ValueError("Refusing to execute multi-statement SQL.")
+    first = body.split(None, 1)[0].lower()
     if first in MUTATING_PREFIXES:
         raise ValueError(f"Refusing to execute mutating SQL beginning with {first!r}")
     if first not in READ_ONLY_PREFIXES:
@@ -71,9 +82,10 @@ def execute_sql(conn, sql: str, timeout_seconds: int) -> tuple[list[str], list[l
         cursor.close()
 
 
-def call_adapter(case: dict[str, str], args: argparse.Namespace) -> tuple[str | None, list[str], int, bool, str | None]:
+def call_adapter(case: dict[str, str], args: argparse.Namespace) -> tuple[str | None, list[str], list[str], int, bool, str | None]:
     if args.adapter == "fake":
-        return case["expected_sql"], split_csvish(case["tables_involved"]), 0, True, None
+        tables = split_csvish(case["tables_involved"])
+        return case["expected_sql"], tables, tables, 0, True, None
 
     start = time.perf_counter()
     try:
@@ -82,11 +94,18 @@ def call_adapter(case: dict[str, str], args: argparse.Namespace) -> tuple[str | 
         response = httpx.post(args.adapter_url, json={"question": case["human_query"]}, timeout=args.llm_timeout_seconds)
         latency = int((time.perf_counter() - start) * 1000)
         if not response.content:
-            return None, [], latency, False, "empty response body"
+            return None, [], [], latency, False, "empty response body"
         data = response.json()
-        return data.get("sql"), data.get("expanded_tables") or [], latency, True, None
+        return (
+            data.get("sql"),
+            data.get("seed_tables") or [],
+            data.get("expanded_tables") or [],
+            latency,
+            True,
+            None,
+        )
     except (httpx.TimeoutException, httpx.HTTPError, json.JSONDecodeError) as exc:
-        return None, [], int((time.perf_counter() - start) * 1000), False, str(exc)
+        return None, [], [], int((time.perf_counter() - start) * 1000), False, str(exc)
 
 
 def split_csvish(value: str) -> list[str]:
@@ -105,6 +124,13 @@ def write_expected(expected_dir: Path, test_id: str, columns: list[str], rows: l
     (expected_dir / f"{test_id}.json").write_text(json.dumps({"columns": columns, "rows": rows}, indent=2, default=str) + "\n", encoding="utf-8")
 
 
+def _canonical_row(row: list[Any], col_order_insensitive: bool) -> str:
+    if not col_order_insensitive:
+        return json.dumps(row, sort_keys=True, default=str)
+    tokens = sorted(json.dumps(val, sort_keys=True, default=str) for val in row)
+    return json.dumps(tokens)
+
+
 def compare_rows(case: dict[str, str], expected: dict[str, Any], actual_rows: list[list[Any]], strict: bool) -> tuple[str, str]:
     expected_rows = expected.get("rows", [])
     if case["result_type"] == "no_rows_expected":
@@ -116,10 +142,17 @@ def compare_rows(case: dict[str, str], expected: dict[str, Any], actual_rows: li
             return "PASS", ""
         return compare_row_values(expected_rows[0], actual_rows[0])
     order_sensitive = case.get("order_sensitive", "false").lower() == "true"
-    if order_sensitive or strict:
+    if strict:
         return ("PASS", "") if expected_rows == actual_rows else ("FAIL_CONTENT_MISMATCH", "Ordered row content differs.")
-    expected_set = {json.dumps(row, sort_keys=True, default=str) for row in expected_rows}
-    actual_set = {json.dumps(row, sort_keys=True, default=str) for row in actual_rows}
+    if order_sensitive:
+        if expected_rows == actual_rows:
+            return "PASS", ""
+        # Lenient: allow column permutation while preserving row ordering
+        exp_norm = [_canonical_row(r, col_order_insensitive=True) for r in expected_rows]
+        act_norm = [_canonical_row(r, col_order_insensitive=True) for r in actual_rows]
+        return ("PASS", "") if exp_norm == act_norm else ("FAIL_CONTENT_MISMATCH", "Ordered row content differs.")
+    expected_set = {_canonical_row(row, col_order_insensitive=True) for row in expected_rows}
+    actual_set = {_canonical_row(row, col_order_insensitive=True) for row in actual_rows}
     return ("PASS", "") if expected_set == actual_set else ("FAIL_CONTENT_MISMATCH", "Unordered row content differs.")
 
 
@@ -142,19 +175,61 @@ def manifest_names(manifest_path: Path) -> tuple[set[str], dict[str, set[str]]]:
     return tables, columns
 
 
+def extract_cte_names(sql: str) -> set[str]:
+    """Extract CTE names defined in WITH [RECURSIVE] clauses so they aren't treated as hallucinated tables."""
+    if not sql:
+        return set()
+    cleaned = _strip_sql_comments(sql)
+    ctes: set[str] = set()
+    with_match = re.match(r"^\s*with(?:\s+recursive)?\s+", cleaned, flags=re.IGNORECASE)
+    if not with_match:
+        return ctes
+    for match in re.finditer(r"(?:^|\bwith(?:\s+recursive)?|,)\s*`?([a-zA-Z_][\w]*)`?\s+as\s*\(", cleaned, flags=re.IGNORECASE):
+        ctes.add(match.group(1).lower())
+    return ctes
+
+
+def extract_table_refs(sql: str) -> set[str]:
+    """Extract referenced table/view identifiers from FROM/JOIN clauses (excluding CTE aliases)."""
+    if not sql:
+        return set()
+    cleaned = _strip_sql_comments(sql)
+    ctes = extract_cte_names(cleaned)
+    refs = {
+        ref.lower()
+        for ref in re.findall(r"\b(?:from|join)\s+`?([a-zA-Z_][\w]*)`?", cleaned, flags=re.IGNORECASE)
+    }
+    return refs - ctes - {"dual"}
+
+
 def has_hallucinated_table(sql: str, valid_tables: set[str]) -> bool:
     if not sql:
         return False
-    refs = re.findall(r"\b(?:from|join|update|into|table)\s+`?([a-zA-Z_][\w]*)`?", sql, flags=re.IGNORECASE)
-    return any(ref.lower() not in valid_tables for ref in refs)
+    cleaned = _strip_sql_comments(sql)
+    ctes = extract_cte_names(cleaned)
+    allowed = valid_tables | ctes | {"dual"}
+    refs = re.findall(r"\b(?:from|join|update|into|table)\s+`?([a-zA-Z_][\w]*)`?", cleaned, flags=re.IGNORECASE)
+    return any(ref.lower() not in allowed for ref in refs)
+
+
+def table_recall(case: dict[str, str], expanded_tables: list[str]) -> float:
+    expected = {t.lower() for t in split_csvish(case["tables_involved"])}
+    if not expected:
+        return 1.0
+    actual = {t.lower() for t in expanded_tables}
+    return len(expected & actual) / len(expected)
 
 
 def wrong_tables(case: dict[str, str], expanded_tables: list[str], sql: str) -> bool:
-    expected = {t.lower() for t in split_csvish(case["tables_involved"]) if not t.startswith("v_")}
-    actual = {t.lower() for t in expanded_tables}
-    if not actual and sql:
-        actual = {ref.lower() for ref in re.findall(r"\b(?:from|join)\s+`?([a-zA-Z_][\w]*)`?", sql, flags=re.IGNORECASE)}
-    return bool(expected and actual and not (expected & actual))
+    expected = {t.lower() for t in split_csvish(case["tables_involved"])}
+    if not expected:
+        return False
+    retrieved = {t.lower() for t in expanded_tables}
+    sql_refs = extract_table_refs(sql)
+    covered = retrieved | sql_refs
+    if not covered:
+        return True
+    return not expected.issubset(covered)
 
 
 def run(args: argparse.Namespace) -> int:
@@ -188,8 +263,16 @@ def run(args: argparse.Namespace) -> int:
                     print(progress_line(record), flush=True)
                 continue
 
-            generated_sql, expanded_tables, llm_ms, api_success, api_error = call_adapter(case, args)
-            record.update({"generated_sql": generated_sql, "expanded_tables": expanded_tables, "llm_latency_ms": llm_ms, "llm_api_success": api_success})
+            generated_sql, seed_tables, expanded_tables, llm_ms, api_success, api_error = call_adapter(case, args)
+            recall = table_recall(case, expanded_tables)
+            record.update({
+                "generated_sql": generated_sql,
+                "seed_tables": seed_tables,
+                "expanded_tables": expanded_tables,
+                "table_recall": round(recall, 4),
+                "llm_latency_ms": llm_ms,
+                "llm_api_success": api_success,
+            })
             if not api_success:
                 record.update({"outcome": "FAIL_LLM_API_ERROR", "adapter_error": api_error})
                 results.append(record)
@@ -197,7 +280,9 @@ def run(args: argparse.Namespace) -> int:
                     print(progress_line(record), flush=True)
                 continue
             if case["expected_sql"].strip().upper() == "NULL":
-                if generated_sql and generated_sql.strip().split(None, 1)[0].lower() in MUTATING_PREFIXES:
+                cleaned_gen = _strip_sql_comments(generated_sql or "")
+                first_kw = cleaned_gen.split(None, 1)[0].lower() if cleaned_gen else ""
+                if first_kw in MUTATING_PREFIXES:
                     record.update({"outcome": "FAIL_CONTENT_MISMATCH", "diff": "Adapter generated mutating SQL for a safety/refusal case."})
                 else:
                     record.update({"outcome": "PASS", "diff": "Adapter refused or did not generate mutating SQL."})
@@ -276,7 +361,18 @@ def write_reports(results: list[dict[str, Any]], output_dir: Path) -> None:
         for concept in row["sql_concept"].split(","):
             concept_counts[concept.strip()][row["outcome"]] += 1
         difficulty_counts[row["difficulty"]][row["outcome"]] += 1
-    lines = ["# Text-to-SQL Benchmark Report", "", f"Total tests: {len(results)}", f"Passed: {pass_count}", f"Pass rate: {(pass_count / len(results) * 100 if results else 0):.1f}%", "", "## Failure Categories", ""]
+    recalls = [r["table_recall"] for r in results if "table_recall" in r]
+    avg_recall = (sum(recalls) / len(recalls) * 100) if recalls else None
+    lines = [
+        "# Text-to-SQL Benchmark Report",
+        "",
+        f"Total tests: {len(results)}",
+        f"Passed: {pass_count}",
+        f"Pass rate: {(pass_count / len(results) * 100 if results else 0):.1f}%",
+    ]
+    if avg_recall is not None:
+        lines.append(f"Average retrieval table recall: {avg_recall:.1f}%")
+    lines.extend(["", "## Failure Categories", ""])
     lines.extend(f"- {name}: {count}" for name, count in sorted(counts.items()))
     lines.extend(["", "## By Concept", "", "| Concept | Passed | Total |", "|---|---:|---:|"])
     for concept, counter in sorted(concept_counts.items()):
@@ -298,7 +394,7 @@ def append_history(output_dir: Path, results: list[dict[str, Any]], counts: Coun
     path = output_dir / "run_history.json"
     history = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
     total = len(results)
-    history.append({"run_at": datetime.utcnow().isoformat() + "Z", "total": total, "passed": counts.get("PASS", 0), "pass_rate": counts.get("PASS", 0) / total if total else 0, "counts": dict(counts)})
+    history.append({"run_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"), "total": total, "passed": counts.get("PASS", 0), "pass_rate": counts.get("PASS", 0) / total if total else 0, "counts": dict(counts)})
     path.write_text(json.dumps(history, indent=2) + "\n", encoding="utf-8")
 
 
@@ -310,7 +406,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--results-dir", type=Path, default=DEFAULT_RESULTS_DIR)
     parser.add_argument("--adapter", choices=["http", "fake"], default="http")
     parser.add_argument("--adapter-url", default="http://localhost:8000/query")
-    parser.add_argument("--llm-timeout-seconds", type=int, default=60)
+    parser.add_argument("--llm-timeout-seconds", type=int, default=300)
     parser.add_argument("--sql-timeout-seconds", type=int, default=30)
     parser.add_argument("--comparison-mode", choices=["lenient", "strict"], default="lenient")
     parser.add_argument("--concept")

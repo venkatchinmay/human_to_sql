@@ -146,12 +146,13 @@ All configuration is via environment variables (see `.env.example`):
 | `QDRANT_URL` | `http://localhost:6333` | Qdrant server URL |
 | `QDRANT_COLLECTION` | `mysql_schema` | Qdrant collection name |
 | `DENSE_MODEL` | `BAAI/bge-small-en-v1.5` | Dense embedding model |
-| `SPARSE_MODEL` | `naver/splade-v3-small` | Sparse embedding model |
+| `SPARSE_MODEL` | `prithivida/Splade_PP_en_v1` | Sparse embedding model |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama server URL |
 | `OLLAMA_MODEL` | `gemma2:2b` | LLM model for SQL generation |
 | `FK_EXPAND_DEPTH` | `1` | FK graph expansion depth |
 | `TOP_K_RETRIEVAL` | `10` | Candidates per prefetch |
 | `TOP_K_FINAL` | `5` | Final results after RRF fusion |
+| `MAX_EXPANDED_TABLES` | `12` | Max total tables after FK expansion |
 
 ## Helm Chart Values
 

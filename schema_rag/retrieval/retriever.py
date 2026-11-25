@@ -17,14 +17,17 @@ from qdrant_client.models import (
     SparseVector,
 )
 
+from pathlib import Path
+
 from schema_rag.config import (
     FK_EXPAND_DEPTH,
     FK_GRAPH_PATH,
+    MAX_EXPANDED_TABLES,
     QDRANT_COLLECTION,
     TOP_K_FINAL,
     TOP_K_RETRIEVAL,
 )
-from schema_rag.db.fk_graph import load_fk_graph
+from schema_rag.db.fk_graph import expand_via_fk_ranked, load_fk_graph
 from schema_rag.embeddings.dense_encoder import DenseEncoder
 from schema_rag.embeddings.sparse_encoder import SparseEncoder
 
@@ -39,17 +42,27 @@ class SchemaRetriever:
         qdrant: QdrantClient,
         dense_enc: DenseEncoder,
         sparse_enc: SparseEncoder,
+        collection_name: str = QDRANT_COLLECTION,
+        fk_expand_depth: int = FK_EXPAND_DEPTH,
+        max_expanded_tables: int = MAX_EXPANDED_TABLES,
     ) -> None:
         self._client = qdrant
         self._dense_enc = dense_enc
         self._sparse_enc = sparse_enc
+        self._collection_name = collection_name
+        self._fk_expand_depth = fk_expand_depth
+        self._max_expanded_tables = max_expanded_tables
 
         # Load FK graph once (graceful degradation if missing)
         self._fk_graph: nx.DiGraph | None = load_fk_graph(FK_GRAPH_PATH)
         if self._fk_graph is not None:
-            logger.info("FK graph loaded — expansion enabled (depth=%d)", FK_EXPAND_DEPTH)
+            logger.info("FK graph loaded — expansion enabled (depth=%d)", self._fk_expand_depth)
         else:
             logger.warning("FK graph not available — retrieval will return seed tables only")
+
+    def reload_fk_graph(self, path: Path = FK_GRAPH_PATH) -> None:
+        """Reload the persisted FK graph (e.g., after schema re-ingestion)."""
+        self._fk_graph = load_fk_graph(path)
 
     # ------------------------------------------------------------------
     # Public API
@@ -74,19 +87,20 @@ class SchemaRetriever:
         )
 
         # 2. Hybrid search via Qdrant (Prefetch dense + sparse → RRF fusion)
+        prefetch_limit = max(TOP_K_RETRIEVAL, top_k)
         prefetch_dense = Prefetch(
             query=dense_vec,
             using="dense",
-            limit=TOP_K_RETRIEVAL,
+            limit=prefetch_limit,
         )
         prefetch_sparse = Prefetch(
             query=sparse_vec,
             using="sparse",
-            limit=TOP_K_RETRIEVAL,
+            limit=prefetch_limit,
         )
 
         results = self._client.query_points(
-            collection_name=QDRANT_COLLECTION,
+            collection_name=self._collection_name,
             prefetch=[prefetch_dense, prefetch_sparse],
             query=FusionQuery(fusion=Fusion.RRF),
             limit=top_k,
@@ -97,34 +111,38 @@ class SchemaRetriever:
         seed_tables: list[str] = []
         seed_payloads: list[dict[str, Any]] = []
         for point in results:
+            if not point.payload:
+                continue
             payload = dict(point.payload)  # type: ignore[arg-type]
             tname = payload["table_name"]
-            seed_tables.append(tname)
-            seed_payloads.append(payload)
+            if tname not in seed_tables:
+                seed_tables.append(tname)
+                seed_payloads.append(payload)
 
-        # 4. FK expansion
-        expanded_tables: set[str] = set(seed_tables)
-        if self._fk_graph is not None:
+        # 4. FK expansion (deterministic + bounded)
+        expanded_tables: list[str] = list(seed_tables)
+        if self._fk_graph is not None and seed_tables:
             expanded_tables = self._expand(seed_tables)
 
         # 5. Fetch payloads for expanded tables not in the seed set
-        new_tables = expanded_tables - set(seed_tables)
-        extra_payloads = self._fetch_payloads_by_tables(list(new_tables))
+        seed_set = set(seed_tables)
+        new_tables = [t for t in expanded_tables if t not in seed_set]
+        extra_payloads = self._fetch_payloads_by_tables(new_tables)
         all_payloads = seed_payloads + extra_payloads
 
         # 6. Assemble DDL context
-        ddl_lines = [p["ddl"] for p in all_payloads]
+        ddl_lines = [p["ddl"] for p in all_payloads if p.get("ddl")]
         ddl_context = "\n\n".join(ddl_lines)
 
         logger.info(
             "Retrieval complete: seed=%s, expanded=%s",
             seed_tables,
-            list(new_tables),
+            new_tables,
         )
 
         return {
             "seed_tables": seed_tables,
-            "expanded_tables": list(expanded_tables),
+            "expanded_tables": expanded_tables,
             "ddl_context": ddl_context,
             "payloads": all_payloads,
         }
@@ -133,19 +151,22 @@ class SchemaRetriever:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _expand(self, seed_tables: list[str]) -> set[str]:
+    def _expand(self, seed_tables: list[str]) -> list[str]:
         """Expand seed tables through the FK graph."""
-        from schema_rag.db.fk_graph import expand_via_fk
-
-        return expand_via_fk(set(seed_tables), self._fk_graph, depth=FK_EXPAND_DEPTH)  # type: ignore[arg-type]
+        return expand_via_fk_ranked(
+            seed_tables,
+            self._fk_graph,  # type: ignore[arg-type]
+            depth=self._fk_expand_depth,
+            max_total=self._max_expanded_tables,
+        )
 
     def _fetch_payloads_by_tables(self, table_names: list[str]) -> list[dict[str, Any]]:
-        """Scroll Qdrant for payloads of specific table names."""
+        """Scroll Qdrant for payloads of specific table names, preserving order."""
         if not table_names:
             return []
 
         results, _ = self._client.scroll(
-            collection_name=QDRANT_COLLECTION,
+            collection_name=self._collection_name,
             scroll_filter=Filter(
                 must=[
                     FieldCondition(
@@ -158,7 +179,13 @@ class SchemaRetriever:
             with_payload=True,
         )
 
-        payloads: list[dict[str, Any]] = []
+        by_name: dict[str, dict[str, Any]] = {}
         for point in results:
-            payloads.append(dict(point.payload))  # type: ignore[arg-type]
-        return payloads
+            if not point.payload:
+                continue
+            payload = dict(point.payload)  # type: ignore[arg-type]
+            tname = payload.get("table_name")
+            if tname:
+                by_name[tname] = payload
+
+        return [by_name[t] for t in table_names if t in by_name]

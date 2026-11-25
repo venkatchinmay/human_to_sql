@@ -5,7 +5,6 @@ WORKDIR /build
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
-RUN pip install --no-cache-dir --prefix=/install qdrant-client>=1.12.0
 
 # ---- Runtime stage ----
 FROM python:3.11-slim

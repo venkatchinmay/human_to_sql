@@ -33,14 +33,17 @@ INSERT INTO roles (name, description) VALUES
   ('Roles 3', 'Seeded roles row 3');
 
 INSERT INTO customer_segments (name, description) VALUES
-  ('Customer Segments 1', 'Seeded customer_segments row 1'),
-  ('Customer Segments 2', 'Seeded customer_segments row 2'),
-  ('Customer Segments 3', 'Seeded customer_segments row 3');
+  ('VIP', 'Seeded customer_segments row 1'),
+  ('Standard', 'Seeded customer_segments row 2'),
+  ('Enterprise', 'Seeded customer_segments row 3');
 
 INSERT INTO categories (parent_id, name, slug) VALUES
-  (NULL, 'Categories 1', 'Categories 1'),
-  (2, 'Categories 2', 'Categories 2'),
-  (3, 'Categories 3', 'Categories 3');
+  (NULL, 'Categories 1', 'cat-1'),
+  (1, 'Categories 2', 'cat-2'),
+  (2, 'Categories 3', 'cat-3'),
+  (1, 'Categories 4', 'cat-4'),
+  (1, 'Categories 5', 'dept-5'),
+  (2, 'Categories 6', 'dept-6');
 
 INSERT INTO product_tax_codes (code, description) VALUES
   ('C01', 'Seeded product_tax_codes row 1'),
@@ -79,22 +82,25 @@ INSERT INTO stores (country_id, currency_id, name, opened_on) VALUES
 
 INSERT INTO employees (department_id, role_id, manager_id, first_name, last_name, email, hired_on, salary) VALUES
   (1, 1, NULL, 'First1', 'Last1', 'employees1@example.com', '2024-01-01', 333.86),
-  (2, 2, 2, 'First2', 'Last2', 'employees2@example.com', '2024-02-02', 221.18),
-  (3, 3, 3, 'First3', 'Last3', 'employees3@example.com', '2024-03-03', 374.65);
+  (2, 2, 1, 'First2', 'Last2', 'employees2@example.com', '2024-02-02', 221.18),
+  (3, 3, 2, 'First3', 'Last3', 'employees3@example.com', '2024-03-03', 374.65),
+  (1, 1, 1, 'First4', 'Last4', 'employees4@example.com', '2024-04-04', 115.43),
+  (2, 2, 1, 'First5', 'Last5', 'employees5@example.com', '2024-05-05', 281.14),
+  (3, 3, 2, 'First6', 'Last6', 'employees6@example.com', '2024-06-06', 156.71);
 
 INSERT INTO customers (segment_id, preferred_language_id, email, first_name, last_name, birth_date, created_at, loyalty_points, metadata) VALUES
-  (1, 1, 'customers1@example.com', 'First1', 'Last1', '2024-01-01', '2024-01-01 10:01:00', 8, '{"seed": 1, "tier": "plus"}'),
-  (2, 2, 'customers2@example.com', 'First2', 'Last2', '2024-02-02', '2024-02-02 10:02:00', 18, '{"seed": 2, "tier": "vip"}'),
-  (3, 3, 'customers3@example.com', 'First3', 'Last3', '2024-03-03', '2024-03-03 10:03:00', 10, '{"seed": 3, "tier": "basic"}'),
-  (1, 1, 'customers4@example.com', 'First4', 'Last4', '2024-04-04', '2024-04-04 10:04:00', 1, '{"seed": 4, "tier": "plus"}'),
-  (2, 2, 'customers5@example.com', 'First5', 'Last5', '2024-05-05', '2024-05-05 10:05:00', 7, '{"seed": 5, "tier": "vip"}'),
-  (3, 3, 'customers6@example.com', 'First6', 'Last6', '2024-06-06', '2024-06-06 10:06:00', 20, '{"seed": 6, "tier": "basic"}'),
-  (1, 1, 'customers7@example.com', 'First7', 'Last7', '2024-07-07', '2024-07-07 10:07:00', 20, '{"seed": 7, "tier": "plus"}'),
-  (2, 2, 'customers8@example.com', 'First8', 'Last8', '2024-08-08', '2024-08-08 10:08:00', 12, '{"seed": 8, "tier": "vip"}'),
-  (3, 3, 'customers9@example.com', 'First9', 'Last9', '2024-09-09', '2024-09-09 10:09:00', 11, '{"seed": 9, "tier": "basic"}'),
-  (1, 1, 'customers10@example.com', 'First10', 'Last10', '2024-10-10', '2024-10-10 10:10:00', 7, '{"seed": 10, "tier": "plus"}'),
-  (2, 2, 'customers11@example.com', 'First11', 'Last11', '2024-11-11', '2024-11-11 10:11:00', 24, '{"seed": 11, "tier": "vip"}'),
-  (3, 3, 'customers12@example.com', 'First12', 'Last12', '2024-12-12', '2024-12-12 10:12:00', 23, '{"seed": 12, "tier": "basic"}');
+  (1, 1, 'customers1@example.com', 'First1', 'Last1', '2024-01-01', '2024-01-01 10:01:00', 7, '{"seed": 1, "tier": "plus"}'),
+  (2, 2, 'customers2@example.com', 'First2', 'Last2', '2024-02-02', '2024-02-02 10:02:00', 20, '{"seed": 2, "tier": "vip"}'),
+  (3, 3, 'customers3@example.com', 'First3', 'Last3', '2024-03-03', '2024-03-03 10:03:00', 20, '{"seed": 3, "tier": "basic"}'),
+  (NULL, 1, 'customers4@example.com', 'First4', 'Last4', '2024-04-04', '2024-04-04 10:04:00', 12, '{"seed": 4, "tier": "plus"}'),
+  (2, 2, 'customers5@example.com', 'First5', 'Last5', NULL, '2024-05-05 10:05:00', 11, '{"seed": 5, "tier": "vip"}'),
+  (3, 3, 'customers6@example.com', 'First6', 'Last6', '2024-06-06', '2024-06-06 10:06:00', 7, '{"seed": 6, "tier": "basic"}'),
+  (1, 1, 'customers7@example.com', 'First7', 'Last7', '2024-07-07', '2024-07-07 10:07:00', 24, '{"seed": 7, "tier": "plus"}'),
+  (NULL, 2, 'customers8@example.com', 'First8', 'Last8', '2024-08-08', '2024-08-08 10:08:00', 23, '{"seed": 8, "tier": "vip"}'),
+  (3, 3, 'customers9@example.com', 'First9', 'Last9', '2024-09-09', '2024-09-09 10:09:00', 12, '{"seed": 9, "tier": "basic"}'),
+  (1, 1, 'customers10@example.com', 'First10', 'Last10', NULL, '2024-10-10 10:10:00', 21, '{"seed": 10, "tier": "plus"}'),
+  (2, 2, 'customers11@example.com', 'First11', NULL, '2024-11-11', '2024-11-11 10:11:00', 6, '{"seed": 11, "tier": "vip"}'),
+  (NULL, 3, 'customers12@example.com', 'First12', 'Last12', '2024-12-12', '2024-12-12 10:12:00', 8, '{"seed": 12, "tier": "basic"}');
 
 INSERT INTO brands (name, country_id, is_private_label) VALUES
   ('Brands 1', 1, FALSE),
@@ -134,7 +140,7 @@ INSERT INTO loyalty_programs (currency_id, name, status, created_at, notes) VALU
 INSERT INTO service_level_agreements (customer_segment_id, name, status, created_at, notes) VALUES
   (1, 'Service Level Agreements 1', 'pending', '2024-01-01 10:01:00', 'Seeded service_level_agreements row 1'),
   (2, 'Service Level Agreements 2', 'delivered', '2024-02-02 10:02:00', 'Seeded service_level_agreements row 2'),
-  (3, 'Service Level Agreements 3', 'active', '2024-03-03 10:03:00', 'Seeded service_level_agreements row 3');
+  (1, 'Service Level Agreements 3', 'active', '2024-03-03 10:03:00', 'Seeded service_level_agreements row 3');
 
 INSERT INTO marketing_campaigns (channel_id, name, status, created_at, notes) VALUES
   (1, 'Marketing Campaigns 1', 'pending', '2024-01-01 10:01:00', 'Seeded marketing_campaigns row 1'),
@@ -152,9 +158,9 @@ INSERT INTO ab_tests (channel_id, name, status, created_at, notes) VALUES
   (3, 'Ab Tests 3', 'active', '2024-03-03 10:03:00', 'Seeded ab_tests row 3');
 
 INSERT INTO tax_rules (tax_region_id, product_tax_code, tax_rate) VALUES
-  (1, 'Tax Rules 1', 189.64),
-  (2, 'Tax Rules 2', 88.17),
-  (3, 'Tax Rules 3', 116.18);
+  (1, 'Tax Rules 1', 215.52),
+  (2, 'Tax Rules 2', 143.05),
+  (3, 'Tax Rules 3', 80.94);
 
 INSERT INTO employee_store_assignments (employee_id, store_id, started_on, ended_on) VALUES
   (1, 1, '2024-01-01', '2024-01-01'),
@@ -167,9 +173,12 @@ INSERT INTO customer_profiles (customer_id, gender, income_band, marketing_opt_i
   (3, 'unknown', 'Customer Profiles 3', FALSE);
 
 INSERT INTO addresses (customer_id, country_id, line1, line2, city, state, postal_code, address_type) VALUES
-  (1, 1, 'Addresses 1', 'Addresses 1', 'Addresses 1', 'Addresses 1', 'Addresses 1', 'shipping'),
-  (2, 2, 'Addresses 2', 'Addresses 2', 'Addresses 2', 'Addresses 2', 'Addresses 2', 'store'),
-  (3, 3, 'Addresses 3', 'Addresses 3', 'Addresses 3', 'Addresses 3', 'Addresses 3', 'billing');
+  (1, 1, 'Addresses 1', NULL, 'Austin', 'Addresses 1', 'Addresses 1', 'shipping'),
+  (2, 2, 'Addresses 2', 'Suite 20', 'Seattle', 'Addresses 2', 'Addresses 2', 'store'),
+  (3, 3, 'Addresses 3', NULL, 'Denver', 'Addresses 3', 'Addresses 3', 'billing'),
+  (1, 1, 'Addresses 4', 'Suite 40', 'Boston', 'Addresses 4', 'Addresses 4', 'shipping'),
+  (2, 2, 'Addresses 5', NULL, 'Chicago', 'Addresses 5', 'Addresses 5', 'store'),
+  (3, 3, 'Addresses 6', 'Suite 60', 'Miami', 'Addresses 6', 'Addresses 6', 'billing');
 
 INSERT INTO customer_notes (customer_id, employee_id, note, created_at) VALUES
   (1, 1, 'Seeded customer_notes row 1', '2024-01-01 10:01:00'),
@@ -187,18 +196,18 @@ INSERT INTO supplier_contacts (supplier_id, name, email, phone) VALUES
   (3, 'Supplier Contacts 3', 'supplier_contacts3@example.com', 'Supplier Contacts 3');
 
 INSERT INTO products (brand_id, supplier_id, unit_type_id, tax_code_id, sku, name, description, status, base_price, weight, attributes) VALUES
-  (1, 1, 1, 1, 'PRO-00001', 'Products 1', 'Seeded products row 1', 'active', 448.25, 274.46, '{"seed": 1, "tier": "plus"}'),
-  (2, 2, 2, 2, 'PRO-00002', 'Products 2', 'Seeded products row 2', 'discontinued', 158.82, 89.93, '{"seed": 2, "tier": "vip"}'),
-  (3, 3, 3, 3, 'PRO-00003', 'Products 3', 'Seeded products row 3', 'draft', 329.89, 256.81, '{"seed": 3, "tier": "basic"}'),
-  (1, 1, 1, 1, 'PRO-00004', 'Products 4', 'Seeded products row 4', 'active', 383.1, 155.32, '{"seed": 4, "tier": "plus"}'),
-  (2, 2, 2, 2, 'PRO-00005', 'Products 5', 'Seeded products row 5', 'discontinued', 204.3, 387.7, '{"seed": 5, "tier": "vip"}'),
-  (3, 3, 3, 3, 'PRO-00006', 'Products 6', 'Seeded products row 6', 'draft', 354.68, 373.66, '{"seed": 6, "tier": "basic"}'),
-  (1, 1, 1, 1, 'PRO-00007', 'Products 7', 'Seeded products row 7', 'active', 185.25, 495.35, '{"seed": 7, "tier": "plus"}'),
-  (2, 2, 2, 2, 'PRO-00008', 'Products 8', 'Seeded products row 8', 'discontinued', 200.59, 290.23, '{"seed": 8, "tier": "vip"}'),
-  (3, 3, 3, 3, 'PRO-00009', 'Products 9', 'Seeded products row 9', 'draft', 392.3, 155.41, '{"seed": 9, "tier": "basic"}'),
-  (1, 1, 1, 1, 'PRO-00010', 'Products 10', 'Seeded products row 10', 'active', 155.16, 468.3, '{"seed": 10, "tier": "plus"}'),
-  (2, 2, 2, 2, 'PRO-00011', 'Products 11', 'Seeded products row 11', 'discontinued', 322.13, 439.48, '{"seed": 11, "tier": "vip"}'),
-  (3, 3, 3, 3, 'PRO-00012', 'Products 12', 'Seeded products row 12', 'draft', 88.91, 438.11, '{"seed": 12, "tier": "basic"}');
+  (1, 1, 1, 1, 'PRO-00001', 'Classic Canvas Tote', 'Seeded products row 1', 'active', 319.12, 52.05, '{"seed": 1, "tier": "plus"}'),
+  (2, 2, 2, 2, 'PRO-00002', 'Studio Monitor 27', 'Seeded products row 2', 'discontinued', 435.29, 26.66, '{"seed": 2, "tier": "vip"}'),
+  (3, 3, 3, 3, 'PRO-00003', 'Merino Wool Scarf', 'Seeded products row 3', 'draft', 137.24, 227.47, '{"seed": 3, "tier": "basic"}'),
+  (1, 1, 1, 1, 'PRO-00004', 'Wireless Mouse M4', 'Seeded products row 4', 'active', 493.97, 31.03, '{"seed": 4, "tier": "plus"}'),
+  (2, 2, 2, 2, 'PRO-00005', 'Ceramic Pour Over', 'Seeded products row 5', 'discontinued', 365.95, 42.11, '{"seed": 5, "tier": "vip"}'),
+  (3, 3, 3, 3, 'PRO-00006', 'USB Hub 4-Port', 'Seeded products row 6', 'draft', 254.63, 378.82, '{"seed": 6, "tier": "basic"}'),
+  (1, 1, 1, 1, 'PRO-00007', 'Leather Desk Mat', 'Seeded products row 7', 'active', 421.21, 58.4, '{"seed": 7, "tier": "plus"}'),
+  (2, 2, 2, 2, 'PRO-00008', 'Smart Thermostat V2', 'Seeded products row 8', 'discontinued', 62.93, 117.25, '{"seed": 8, "tier": "vip"}'),
+  (3, 3, 3, 3, 'PRO-00009', 'Cotton Crew Tee', 'Seeded products row 9', 'draft', 215.55, 307.76, '{"seed": 9, "tier": "basic"}'),
+  (1, 1, 1, 1, 'PRO-00010', 'Mechanical Keyboard 75', 'Seeded products row 10', 'active', 57.19, 262.78, '{"seed": 10, "tier": "plus"}'),
+  (2, 2, 2, 2, 'PRO-00011', 'Bamboo Cutting Board', 'Seeded products row 11', 'discontinued', 9.14, 141.23, '{"seed": 11, "tier": "vip"}'),
+  (3, 3, 3, 3, 'PRO-00012', 'Portable SSD 1TB', 'Seeded products row 12', 'draft', 218.61, 187.57, '{"seed": 12, "tier": "basic"}');
 
 INSERT INTO warehouse_zones (warehouse_id, name, status, created_at, notes) VALUES
   (1, 'Warehouse Zones 1', 'pending', '2024-01-01 10:01:00', 'Seeded warehouse_zones row 1'),
@@ -271,14 +280,14 @@ INSERT INTO data_exports (requested_by_employee_id, name, status, created_at, no
   (3, 'Data Exports 3', 'active', '2024-03-03 10:03:00', 'Seeded data_exports row 3');
 
 INSERT INTO daily_sales_summary (store_id, channel_id, currency_id, summary_date, metric_count, metric_amount) VALUES
-  (1, 1, 1, '2024-01-01', 22, 218.61),
-  (2, 2, 2, '2024-02-02', 12, 280.88),
-  (3, 3, 3, '2024-03-03', 3, 272.61);
+  (1, 1, 1, '2024-01-01', 18, 479.39),
+  (2, 2, 2, '2024-02-02', 18, 13.35),
+  (3, 3, 3, '2024-03-03', 19, 167.29);
 
 INSERT INTO vendor_scorecards (supplier_id, summary_date, metric_count, metric_amount) VALUES
-  (1, '2024-01-01', 22, 293.4),
-  (2, '2024-02-02', 5, 53.06),
-  (3, '2024-03-03', 2, 404.0);
+  (1, '2024-01-01', 5, 53.06),
+  (2, '2024-02-02', 2, 404.0),
+  (3, '2024-03-03', 23, 65.37);
 
 INSERT INTO route_plans (warehouse_id, carrier_id, name, status, created_at, notes) VALUES
   (1, 1, 'Route Plans 1', 'pending', '2024-01-01 10:01:00', 'Seeded route_plans row 1'),
@@ -301,19 +310,19 @@ INSERT INTO product_categories (product_id, category_id, is_primary) VALUES
   (3, 3, FALSE);
 
 INSERT INTO product_images (product_id, url, alt_text, sort_order) VALUES
-  (1, 'Product Images 1', 'Seeded product_images row 1', 23),
-  (2, 'Product Images 2', 'Seeded product_images row 2', 4),
-  (3, 'Product Images 3', 'Seeded product_images row 3', 17);
+  (1, 'Product Images 1', 'Seeded product_images row 1', 11),
+  (2, 'Product Images 2', 'Seeded product_images row 2', 2),
+  (3, 'Product Images 3', 'Seeded product_images row 3', 16);
 
 INSERT INTO product_variants (product_id, sku, color, size, price_delta) VALUES
-  (1, 'PRO-00001', 'Product Variants 1', 'Product Variants 1', 391.82),
-  (2, 'PRO-00002', 'Product Variants 2', 'Product Variants 2', 33.7),
-  (3, 'PRO-00003', 'Product Variants 3', 'Product Variants 3', 167.35);
+  (1, 'PRO-00001', 'Product Variants 1', 'Product Variants 1', 167.35),
+  (2, 'PRO-00002', 'Product Variants 2', 'Product Variants 2', 394.33),
+  (3, 'PRO-00003', 'Product Variants 3', 'Product Variants 3', 332.25);
 
 INSERT INTO product_bundle_items (bundle_id, product_id, quantity) VALUES
-  (1, 1, 6),
-  (2, 2, 22),
-  (3, 3, 11);
+  (1, 1, 11),
+  (2, 2, 15),
+  (3, 3, 1);
 
 INSERT INTO product_prices (product_id, price_list_id, name, status, created_at, notes) VALUES
   (1, 1, 'Product Prices 1', 'pending', '2024-01-01 10:01:00', 'Seeded product_prices row 1'),
@@ -326,14 +335,14 @@ INSERT INTO price_history (product_id, currency_id, name, status, created_at, no
   (3, 3, 'Price History 3', 'active', '2024-03-03 10:03:00', 'Seeded price_history row 3');
 
 INSERT INTO inventory_items (product_id, warehouse_id, quantity, unit_price, line_total) VALUES
-  (1, 1, 15, 6.98, 332.12),
-  (2, 2, 2, 495.69, 206.39),
-  (3, 3, 25, 149.53, 321.59);
+  (1, 1, 16, 332.12, 21.75),
+  (2, 2, 5, 206.39, 410.05),
+  (3, 3, 10, 216.77, 352.89);
 
 INSERT INTO purchase_order_items (purchase_order_id, product_id, quantity, unit_price, line_total) VALUES
-  (1, 1, 2, 299.67, 43.06),
-  (2, 2, 4, 437.24, 219.58),
-  (3, 3, 11, 410.61, 483.53);
+  (1, 1, 20, 130.89, 124.98),
+  (2, 2, 14, 418.98, 172.34),
+  (3, 3, 4, 375.91, 116.77);
 
 INSERT INTO receiving_batches (purchase_order_id, warehouse_id, name, status, created_at, notes) VALUES
   (1, 1, 'Receiving Batches 1', 'pending', '2024-01-01 10:01:00', 'Seeded receiving_batches row 1'),
@@ -341,28 +350,28 @@ INSERT INTO receiving_batches (purchase_order_id, warehouse_id, name, status, cr
   (3, 3, 'Receiving Batches 3', 'active', '2024-03-03 10:03:00', 'Seeded receiving_batches row 3');
 
 INSERT INTO cart_items (cart_id, product_id, quantity, unit_price, line_total) VALUES
-  (1, 1, 4, 375.91, 116.77),
-  (2, 2, 7, 372.89, 406.24),
-  (3, 3, 11, 433.95, 449.43);
+  (1, 1, 7, 372.89, 406.24),
+  (2, 2, 11, 433.95, 449.43),
+  (3, 3, 22, 161.24, 386.64);
 
 INSERT INTO wishlist_items (wishlist_id, product_id, quantity, unit_price, line_total) VALUES
-  (1, 1, 22, 161.24, 386.64),
-  (2, 2, 12, 276.57, 420.6),
-  (3, 3, 22, 454.7, 167.42);
+  (1, 1, 12, 276.57, 420.6),
+  (2, 2, 22, 454.7, 167.42),
+  (3, 3, 23, 115.95, 216.92);
 
 INSERT INTO orders (customer_id, store_id, channel_id, billing_address_id, shipping_address_id, order_number, status, ordered_at, subtotal, discount_amount, tax_amount, shipping_amount, total_amount) VALUES
-  (1, 1, 1, 1, 1, 'ORD-000001', 'paid', '2024-01-01 10:01:00', 357.96, 182.41, 147.99, 329.21, 334.22),
-  (2, 2, 2, 2, 2, 'ORD-000002', 'delivered', '2024-02-02 10:02:00', 396.94, 82.06, 392.68, 422.39, 231.86),
-  (3, 3, 3, 3, 3, 'ORD-000003', 'pending', '2024-03-03 10:03:00', 343.56, 315.01, 149.93, 262.79, 300.12),
-  (1, 1, 1, 1, 1, 'ORD-000004', 'paid', '2024-04-04 10:04:00', 315.89, 373.52, 284.1, 159.99, 224.94),
-  (2, 2, 2, 2, 2, 'ORD-000005', 'delivered', '2024-05-05 10:05:00', 489.83, 63.11, 314.67, 14.08, 360.16),
-  (3, 3, 3, 3, 3, 'ORD-000006', 'pending', '2024-06-06 10:06:00', 235.61, 339.01, 265.86, 238.86, 435.92),
-  (1, 1, 1, 1, 1, 'ORD-000007', 'paid', '2024-07-07 10:07:00', 57.33, 84.09, 344.76, 211.72, 333.82),
-  (2, 2, 2, 2, 2, 'ORD-000008', 'delivered', '2024-08-08 10:08:00', 210.07, 134.95, 282.16, 6.66, 420.99),
-  (3, 3, 3, 3, 3, 'ORD-000009', 'pending', '2024-09-09 10:09:00', 128.11, 340.96, 444.7, 257.0, 76.64),
-  (1, 1, 1, 1, 1, 'ORD-000010', 'paid', '2024-10-10 10:10:00', 439.0, 353.51, 49.33, 251.78, 187.97),
-  (2, 2, 2, 2, 2, 'ORD-000011', 'delivered', '2024-11-11 10:11:00', 466.67, 256.19, 193.91, 20.71, 383.03),
-  (3, 3, 3, 3, 3, 'ORD-000012', 'pending', '2024-12-12 10:12:00', 105.01, 319.5, 17.1, 477.57, 234.44);
+  (1, 1, 1, 1, 1, 'ORD-000001', 'paid', '2024-01-01 10:01:00', 204.63, 357.91, 19.37, 143.35, 457.61),
+  (2, 2, 2, 2, 2, 'ORD-000002', 'delivered', '2024-02-02 10:02:00', 481.09, 418.26, 474.2, 260.24, 482.62),
+  (3, 3, 3, 3, 3, 'ORD-000003', 'pending', '2024-03-03 10:03:00', 41.92, 372.28, 0.0, 191.32, 21.12),
+  (1, 1, 1, 1, 1, 'ORD-000004', 'paid', '2024-04-04 10:04:00', 455.12, 331.08, 18.88, 195.99, 474.69),
+  (2, 2, 2, 2, 2, 'ORD-000005', 'delivered', '2024-05-05 10:05:00', 208.57, 267.62, 20.35, 212.64, 311.83),
+  (3, 3, 3, 3, 3, 'ORD-000006', 'pending', '2024-06-06 10:06:00', 331.74, 316.77, 0.0, 333.78, 375.81),
+  (1, 1, 1, 1, 1, 'ORD-000007', 'paid', '2024-07-07 10:07:00', 355.17, 219.03, 290.06, 470.84, 376.79),
+  (2, 2, 2, 2, 2, 'ORD-000008', 'delivered', '2024-08-08 10:08:00', 82.7, 43.84, 380.45, 366.02, 5.8),
+  (3, 3, 3, 3, 3, 'ORD-000009', 'pending', '2024-09-09 10:09:00', 208.13, 161.46, 0.0, 338.25, 283.0),
+  (1, 1, 1, 1, 1, 'ORD-000010', 'paid', '2024-10-10 10:10:00', 289.45, 17.85, 32.5, 191.41, 297.04),
+  (2, 2, 2, 2, 2, 'ORD-000011', 'delivered', '2024-11-11 10:11:00', 270.66, 10.44, 146.23, 94.28, 361.03),
+  (3, 3, 3, 3, 3, 'ORD-000012', 'pending', '2024-12-12 10:12:00', 248.85, 56.35, 0.0, 74.34, 32.02);
 
 INSERT INTO product_questions (product_id, customer_id, name, status, created_at, notes) VALUES
   (1, 1, 'Product Questions 1', 'pending', '2024-01-01 10:01:00', 'Seeded product_questions row 1'),
@@ -398,9 +407,9 @@ INSERT INTO search_logs (session_id, event_type, event_at, details) VALUES
   (3, 'Search Logs 12', '2024-12-12 10:12:00', '{"seed": 12, "tier": "basic"}');
 
 INSERT INTO monthly_inventory_snapshot (warehouse_id, product_id, summary_date, metric_count, metric_amount) VALUES
-  (1, 1, '2024-01-01', 12, 135.49),
-  (2, 2, '2024-02-02', 24, 241.66),
-  (3, 3, '2024-03-03', 8, 68.55);
+  (1, 1, '2024-01-01', 16, 234.44),
+  (2, 2, '2024-02-02', 12, 135.49),
+  (3, 3, '2024-03-03', 24, 241.66);
 
 INSERT INTO store_inventory (store_id, product_id, name, status, created_at, notes) VALUES
   (1, 1, 'Store Inventory 1', 'pending', '2024-01-01 10:01:00', 'Seeded store_inventory row 1'),
@@ -408,14 +417,14 @@ INSERT INTO store_inventory (store_id, product_id, name, status, created_at, not
   (3, 3, 'Store Inventory 3', 'active', '2024-03-03 10:03:00', 'Seeded store_inventory row 3');
 
 INSERT INTO transfer_items (transfer_id, product_id, quantity, unit_price, line_total) VALUES
-  (1, 1, 25, 494.46, 267.69),
-  (2, 2, 11, 476.56, 177.85),
-  (3, 3, 5, 132.19, 175.92);
+  (1, 1, 8, 68.55, 388.61),
+  (2, 2, 18, 267.69, 172.86),
+  (3, 3, 18, 177.85, 70.08);
 
 INSERT INTO pos_transactions (register_id, customer_id, employee_id, order_number, status, ordered_at, subtotal, discount_amount, tax_amount, shipping_amount, total_amount) VALUES
-  (1, 1, 1, 'ORD-000001', 'paid', '2024-01-01 10:01:00', 90.22, 51.22, 38.35, 44.81, 113.71),
-  (2, 2, 2, 'ORD-000002', 'delivered', '2024-02-02 10:02:00', 239.21, 373.19, 429.88, 294.59, 459.96),
-  (3, 3, 3, 'ORD-000003', 'pending', '2024-03-03 10:03:00', 324.41, 436.77, 208.79, 135.28, 23.82);
+  (1, 1, 1, 'ORD-000001', 'paid', '2024-01-01 10:01:00', 318.69, 159.42, 443.36, 493.73, 184.38),
+  (2, 2, 2, 'ORD-000002', 'delivered', '2024-02-02 10:02:00', 22.0, 135.85, 278.51, 382.73, 184.67),
+  (3, 3, 3, 'ORD-000003', 'pending', '2024-03-03 10:03:00', 196.32, 122.82, 450.36, 170.55, 474.78);
 
 INSERT INTO inventory_adjustments (inventory_item_id, employee_id, name, status, created_at, notes) VALUES
   (1, 1, 'Inventory Adjustments 1', 'pending', '2024-01-01 10:01:00', 'Seeded inventory_adjustments row 1'),
@@ -433,18 +442,18 @@ INSERT INTO quality_inspections (receiving_batch_id, employee_id, name, status, 
   (3, 3, 'Quality Inspections 3', 'active', '2024-03-03 10:03:00', 'Seeded quality_inspections row 3');
 
 INSERT INTO order_items (order_id, product_id, product_variant_id, quantity, unit_price, line_total) VALUES
-  (1, 1, 1, 15, 364.94, 401.01),
-  (2, 2, 2, 22, 419.3, 309.31),
-  (3, 3, 3, 24, 232.84, 181.3),
-  (1, 1, 1, 18, 68.94, 357.66),
-  (2, 2, 2, 20, 170.27, 328.21),
-  (3, 3, 3, 20, 441.18, 330.65),
-  (1, 1, 1, 7, 173.55, 126.32),
-  (2, 2, 2, 4, 82.61, 89.74),
-  (3, 3, 3, 10, 54.53, 192.94),
-  (1, 1, 1, 3, 82.96, 61.89),
-  (2, 2, 2, 6, 389.86, 399.07),
-  (3, 3, 3, 6, 224.39, 405.23);
+  (1, 1, 1, 3, 23.82, 432.33),
+  (2, 2, 2, 15, 364.94, 401.01),
+  (3, 3, 3, 22, 419.3, 309.31),
+  (1, 1, 1, 24, 232.84, 181.3),
+  (2, 2, 2, 18, 68.94, 357.66),
+  (3, 3, 3, 20, 170.27, 328.21),
+  (1, 1, 1, 20, 441.18, 330.65),
+  (2, 2, 2, 7, 173.55, 126.32),
+  (3, 3, 3, 4, 82.61, 89.74),
+  (1, 1, 1, 10, 54.53, 192.94),
+  (2, 2, 2, 3, 82.96, 61.89),
+  (3, 3, 3, 6, 389.86, 399.07);
 
 INSERT INTO order_status_history (order_id, changed_by_employee_id, name, status, created_at, notes) VALUES
   (1, 1, 'Order Status History 1', 'pending', '2024-01-01 10:01:00', 'Seeded order_status_history row 1'),
@@ -457,9 +466,9 @@ INSERT INTO order_discounts (order_id, coupon_id, name, status, created_at, note
   (3, 3, 'Order Discounts 3', 'active', '2024-03-03 10:03:00', 'Seeded order_discounts row 3');
 
 INSERT INTO payments (order_id, payment_method_id, status, created_at, amount, notes) VALUES
-  (1, 1, 'pending', '2024-01-01 10:01:00', 431.75, 'Seeded payments row 1'),
-  (2, 2, 'delivered', '2024-02-02 10:02:00', 431.43, 'Seeded payments row 2'),
-  (3, 3, 'active', '2024-03-03 10:03:00', 408.51, 'Seeded payments row 3');
+  (1, 1, 'pending', '2024-01-01 10:01:00', 87.73, 'Seeded payments row 1'),
+  (2, 2, 'delivered', '2024-02-02 10:02:00', 295.75, 'Seeded payments row 2'),
+  (3, 3, 'active', '2024-03-03 10:03:00', 120.76, 'Seeded payments row 3');
 
 INSERT INTO shipments (order_id, shipping_method_id, warehouse_id, name, status, created_at, notes) VALUES
   (1, 1, 1, 'Shipments 1', 'pending', '2024-01-01 10:01:00', 'Seeded shipments row 1'),
@@ -477,9 +486,9 @@ INSERT INTO coupon_redemptions (coupon_id, customer_id, order_id, name, status, 
   (3, 3, 3, 'Coupon Redemptions 3', 'active', '2024-03-03 10:03:00', 'Seeded coupon_redemptions row 3');
 
 INSERT INTO gift_card_transactions (gift_card_id, order_id, status, created_at, amount, notes) VALUES
-  (1, 1, 'pending', '2024-01-01 10:01:00', 204.66, 'Seeded gift_card_transactions row 1'),
-  (2, 2, 'delivered', '2024-02-02 10:02:00', 36.35, 'Seeded gift_card_transactions row 2'),
-  (3, 3, 'active', '2024-03-03 10:03:00', 409.38, 'Seeded gift_card_transactions row 3');
+  (1, 1, 'pending', '2024-01-01 10:01:00', 357.89, 'Seeded gift_card_transactions row 1'),
+  (2, 2, 'delivered', '2024-02-02 10:02:00', 68.38, 'Seeded gift_card_transactions row 2'),
+  (3, 3, 'active', '2024-03-03 10:03:00', 227.0, 'Seeded gift_card_transactions row 3');
 
 INSERT INTO product_answers (question_id, employee_id, name, status, created_at, notes) VALUES
   (1, 1, 'Product Answers 1', 'pending', '2024-01-01 10:01:00', 'Seeded product_answers row 1'),
@@ -502,19 +511,19 @@ INSERT INTO fraud_checks (order_id, name, status, created_at, notes) VALUES
   (3, 'Fraud Checks 3', 'active', '2024-03-03 10:03:00', 'Seeded fraud_checks row 3');
 
 INSERT INTO pos_transaction_items (transaction_id, product_id, quantity, unit_price, line_total) VALUES
-  (1, 1, 6, 210.53, 285.06),
-  (2, 2, 9, 337.55, 317.87),
-  (3, 3, 14, 266.81, 101.69);
+  (1, 1, 16, 36.35, 409.38),
+  (2, 2, 6, 210.53, 285.06),
+  (3, 3, 9, 337.55, 317.87);
 
 INSERT INTO payment_refunds (payment_id, status, created_at, amount, notes) VALUES
-  (1, 'pending', '2024-01-01 10:01:00', 463.38, 'Seeded payment_refunds row 1'),
-  (2, 'delivered', '2024-02-02 10:02:00', 83.37, 'Seeded payment_refunds row 2'),
-  (3, 'active', '2024-03-03 10:03:00', 363.86, 'Seeded payment_refunds row 3');
+  (1, 'pending', '2024-01-01 10:01:00', 439.49, 'Seeded payment_refunds row 1'),
+  (2, 'delivered', '2024-02-02 10:02:00', 266.81, 'Seeded payment_refunds row 2'),
+  (3, 'active', '2024-03-03 10:03:00', 101.69, 'Seeded payment_refunds row 3');
 
 INSERT INTO shipment_items (shipment_id, order_item_id, quantity, unit_price, line_total) VALUES
-  (1, 1, 21, 395.07, 420.32),
-  (2, 2, 4, 116.18, 243.44),
-  (3, 3, 6, 230.76, 219.82);
+  (1, 1, 21, 83.37, 363.86),
+  (2, 2, 21, 395.07, 420.32),
+  (3, 3, 4, 116.18, 243.44);
 
 INSERT INTO shipment_tracking_events (shipment_id, event_type, event_at, details) VALUES
   (1, 'Shipment Tracking Events 1', '2024-01-01 10:01:00', '{"seed": 1, "tier": "plus"}'),
@@ -522,14 +531,14 @@ INSERT INTO shipment_tracking_events (shipment_id, event_type, event_at, details
   (3, 'Shipment Tracking Events 3', '2024-03-03 10:03:00', '{"seed": 3, "tier": "basic"}');
 
 INSERT INTO return_items (return_id, order_item_id, reason_id, quantity, unit_price, line_total) VALUES
-  (1, 1, 1, 1, 274.58, 486.11),
-  (2, 2, 2, 5, 355.15, 254.32),
-  (3, 3, 3, 1, 230.55, 490.65);
+  (1, 1, 1, 6, 230.76, 219.82),
+  (2, 2, 2, 1, 274.58, 486.11),
+  (3, 3, 3, 5, 355.15, 254.32);
 
 INSERT INTO refunds (return_id, payment_id, status, created_at, amount, notes) VALUES
-  (1, 1, 'pending', '2024-01-01 10:01:00', 394.86, 'Seeded refunds row 1'),
-  (2, 2, 'delivered', '2024-02-02 10:02:00', 90.73, 'Seeded refunds row 2'),
-  (3, 3, 'active', '2024-03-03 10:03:00', 239.88, 'Seeded refunds row 3');
+  (1, 1, 'pending', '2024-01-01 10:01:00', 17.95, 'Seeded refunds row 1'),
+  (2, 2, 'delivered', '2024-02-02 10:02:00', 322.74, 'Seeded refunds row 2'),
+  (3, 3, 'active', '2024-03-03 10:03:00', 412.79, 'Seeded refunds row 3');
 
 INSERT INTO reviews (product_id, customer_id, order_item_id, name, status, created_at, notes) VALUES
   (1, 1, 1, 'Reviews 1', 'pending', '2024-01-01 10:01:00', 'Seeded reviews row 1'),

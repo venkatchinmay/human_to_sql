@@ -308,6 +308,23 @@
             if (e.key === 'Enter') runQuery();
         }
 
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function highlightSql(rawSql) {
+            const escaped = escapeHtml(rawSql);
+            return escaped.replace(
+                /\b(SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|ON|GROUP\s+BY|ORDER\s+BY|HAVING|LIMIT|OFFSET|AND|OR|NOT|AS|IN|IS|NULL|EXISTS|DISTINCT|UNION|ALL|WITH|RECURSIVE|CASE|WHEN|THEN|ELSE|END|DESC|ASC|SUM|COUNT|AVG|MIN|MAX)\b/gi,
+                '<span class="sql-keyword">$1</span>'
+            );
+        }
+
         async function runQuery() {
             const q = document.getElementById('question').value.trim();
             if (!q) return;
@@ -334,23 +351,26 @@
                 const data = await res.json();
                 
                 if (res.ok) {
+                    const seedTables = Array.isArray(data.seed_tables) ? data.seed_tables : [];
+                    const expandedTables = Array.isArray(data.expanded_tables) ? data.expanded_tables : [];
+
                     document.getElementById('seed-tags').innerHTML = 
-                        data.seed_tables && data.seed_tables.length > 0 ? 
-                        data.seed_tables.map(t => `<span class="tag">${t}</span>`).join('') :
+                        seedTables.length > 0 ? 
+                        seedTables.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('') :
                         '<span style="color: #71717a; font-size: 0.9rem;">None</span>';
                         
                     document.getElementById('expanded-tags').innerHTML = 
-                        data.expanded_tables && data.expanded_tables.length > 0 ? 
-                        data.expanded_tables.map(t => `<span class="tag expanded">${t}</span>`).join('') :
+                        expandedTables.length > 0 ? 
+                        expandedTables.map(t => `<span class="tag expanded">${escapeHtml(t)}</span>`).join('') :
                         '<span style="color: #71717a; font-size: 0.9rem;">None</span>';
                         
-                    let sql = data.sql || "";
-                    sql = sql.replace(/(SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|ON|GROUP\sBY|ORDER\sBY|LIMIT|AND|OR|AS|IN|SUM|COUNT|AVG)/gi, '<span class="sql-keyword">$1</span>');
-                    
-                    document.getElementById('sql-output').innerHTML = sql;
+                    const rawSql = (data.sql || "").trim();
+                    document.getElementById('sql-output').innerHTML = rawSql
+                        ? highlightSql(rawSql)
+                        : '<span style="color: #71717a;">-- No read-only SQL generated for this request.</span>';
                     resultPanel.style.display = 'block';
                 } else {
-                    errorMsg.innerText = "Error: " + JSON.stringify(data.error || data);
+                    errorMsg.innerText = "Error: " + JSON.stringify(data.error || data.detail || data);
                     errorMsg.style.display = 'block';
                 }
             } catch (err) {
